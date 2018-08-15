@@ -145,6 +145,10 @@ ifneq (,$(filter trickle,$(USEMODULE)))
   USEMODULE += xtimer
 endif
 
+ifneq (,$(filter hx711,$(USEMODULE)))
+  USEMODULE += advanced_io
+endif
+
 ifneq (,$(filter gnrc_netif,$(USEMODULE)))
   USEMODULE += netif
 endif

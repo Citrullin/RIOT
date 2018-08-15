@@ -42,9 +42,9 @@ float hx711_read(void){
     uint8_t data[3];
     uint8_t fill_byte = 0x00;
 
-    data[2] = advanced_io_shift_in(HX711_DOUT, HX711_SCK, MSBFIRST);
-    data[1] = advanced_io_shift_in(HX711_DOUT, HX711_SCK, MSBFIRST);
-    data[0] = advanced_io_shift_in(HX711_DOUT, HX711_SCK, MSBFIRST);
+    data[2] = advanced_io_shift_in(HX711_DOUT, HX711_SCK);
+    data[1] = advanced_io_shift_in(HX711_DOUT, HX711_SCK);
+    data[0] = advanced_io_shift_in(HX711_DOUT, HX711_SCK);
 
 
     for (int i = 0; i < HX711_GAIN; i++) {
