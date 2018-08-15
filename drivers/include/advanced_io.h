@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * Copyright (C) 2017 Philipp-Alexander Blum <philipp-blum@jakiku.de>
  *
@@ -24,13 +25,19 @@
 extern "C" {
 #endif
 
+=======
+>>>>>>> hx711_implementation
 typedef enum {
     MSBFIRST,
     LSBFIRST
 } advanced_io_bit_order_t;
 
+<<<<<<< HEAD
 uint8_t advanced_io_shift_in(gpio_t dataPin, gpio_t clockPin, advanced_io_bit_order_t bitOrder);
 
 #ifdef __cplusplus
 }
 #endif
+=======
+uint8_t advanced_io_shift_in(gpio_t dataPin, gpio_t clockPin, advanced_io_bit_order_t bitOrder);
+>>>>>>> hx711_implementation

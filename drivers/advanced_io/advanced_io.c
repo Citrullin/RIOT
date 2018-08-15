@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  * Copyright (C) 2017 Philipp-Alexander Blum <philipp-blum@jakiku.de>
  *
@@ -28,6 +29,7 @@ uint8_t advanced_io_shift_in(gpio_t data_pin, gpio_t clock_pin, advanced_io_bit_
                 return '\0';
             }
         }
+
         gpio_clear(clock_pin);
     }
 
