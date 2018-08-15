@@ -142,6 +142,10 @@ ifneq (,$(filter fxos8700,$(USEMODULE)))
   FEATURES_REQUIRED += periph_i2c
 endif
 
+ifneq (,$(filter gdew0213c38,$(USEMODULE)))
+  FEATURES_REQUIRED += periph_spi
+endif
+
 ifneq (,$(filter grove_ledbar,$(USEMODULE)))
   USEMODULE += my9221
 endif
