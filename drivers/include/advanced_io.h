@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /*
  * Copyright (C) 2017 Philipp-Alexander Blum <philipp-blum@jakiku.de>
  *
@@ -21,23 +20,14 @@
  * @author     Philipp-Alexander Blum <philipp-blum@jakiku.de>
  */
 
+#include "periph/gpio.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-=======
->>>>>>> hx711_implementation
-typedef enum {
-    MSBFIRST,
-    LSBFIRST
-} advanced_io_bit_order_t;
-
-<<<<<<< HEAD
-uint8_t advanced_io_shift_in(gpio_t dataPin, gpio_t clockPin, advanced_io_bit_order_t bitOrder);
+uint8_t advanced_io_shift_in(gpio_t dataPin, gpio_t clockPin);
 
 #ifdef __cplusplus
 }
 #endif
-=======
-uint8_t advanced_io_shift_in(gpio_t dataPin, gpio_t clockPin, advanced_io_bit_order_t bitOrder);
->>>>>>> hx711_implementation
