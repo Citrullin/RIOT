@@ -28,6 +28,7 @@ extern "C" {
 
 uint8_t advanced_io_shift_in(gpio_t dataPin, gpio_t clockPin);
 
+
 #ifdef __cplusplus
 }
 #endif
