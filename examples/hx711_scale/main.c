@@ -25,6 +25,21 @@
 #include "periph/gpio.h"
 #include "hx711.h"
 
+void calibrate(void){
+    hx711_set_offset(0.f);
+    hx711_set_scale(1.f);
+
+    hx711_power_up();
+
+    puts("Calibration...");
+    float f = hx711_get_units(50);
+    printf("VALUE: %i \n",(int) f);
+    hx711_set_offset(f - 10000);
+    hx711_set_scale(0.333);
+
+    hx711_power_down();
+    puts("Calibrated.");
+}
 
 int main(void)
 {
@@ -36,8 +51,7 @@ int main(void)
     hx711_init(128, (int) GPIO_PIN(1, 13), (int) GPIO_PIN(1, 14));
     puts("Initialized HX711.");
 
-    hx711_set_offset(197485.f);
-    hx711_set_scale(1.455);
+    calibrate();
 
     while(true){
         hx711_power_up();
