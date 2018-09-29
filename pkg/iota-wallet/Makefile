@@ -1,6 +1,6 @@
 PKG_NAME=iota-wallet
 PKG_URL=https://github.com/Citrullin/iota-c-light-wallet.git
-PKG_VERSION=46fd4d7c91bf489350eca784732985a9e8c8796e
+PKG_VERSION=c65eb9df0d2f3a643567209fb6183b874c4c307e
 PKG_LICENSE=MIT
 
 .PHONY: all
