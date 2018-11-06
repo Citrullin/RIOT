@@ -53,6 +53,18 @@ extern "C" {
 /** @} */
 
 /**
+ * @name    Default configuration in case a CC1101 is connected
+ * @{
+ */
+#define CC110X_PARAM_CS            GPIO_PIN(PORT_A, 4)
+#define CC110X_PARAM_GDO0          GPIO_PIN(PORT_B, 0)
+#define CC110X_PARAM_GDO2          GPIO_PIN(PORT_B, 1)
+#define CC110X_PARAM_PATABLE       (&cc110x_patable_433mhz)
+#define CC110X_PARAM_CONFIG        (&cc110x_config_433mhz_250kbps_300khz)
+#define CC110X_PARAM_CHANNELS      (&cc110x_chanmap_433mhz_300khz)
+/** @} */
+
+/**
  * @brief   Initialize board specific hardware, including clock, LEDs and std-IO
  */
 void board_init(void);
