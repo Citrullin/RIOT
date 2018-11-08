@@ -79,6 +79,11 @@ PSEUDOMODULES += adc081c
 PSEUDOMODULES += adc101c
 PSEUDOMODULES += adc121c
 
+# include variants of CC110X drivers as pseudo modules
+PSEUDOMODULES += cc1100
+PSEUDOMODULES += cc1100e
+PSEUDOMODULES += cc1101
+
 # include variants of SX127X drivers as pseudo modules
 PSEUDOMODULES += sx1272
 PSEUDOMODULES += sx1276
