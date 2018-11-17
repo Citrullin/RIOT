@@ -24,6 +24,9 @@
 #include "net/ipv6/addr.h"
 #include "net/gnrc.h"
 #include "net/gnrc/netif.h"
+#include "net/gnrc/nettype.h"
+#include "net/gnrc/netapi.h"
+#include <net/gnrc/pktbuf.h>
 
 int main(void)
 {
@@ -44,7 +47,15 @@ int main(void)
             char ipv6_addr[IPV6_ADDR_MAX_STR_LEN];
 
             ipv6_addr_to_str(ipv6_addr, &ipv6_addrs[i], IPV6_ADDR_MAX_STR_LEN);
-            printf("My address is %s\n", ipv6_addr);
+            printf("gnrc: My address is %s\n", ipv6_addr);
+
+            gnrc_pktbuf_init();
+
+            gnrc_pktsnip_t* snip;
+            char data[5] = {255, 255, 255, 255, 255};
+            snip = gnrc_pktbuf_add('\0', data, 5, GNRC_NETTYPE_UNDEF);
+
+            gnrc_netapi_send(netif->pid, snip);
         }
     }
 

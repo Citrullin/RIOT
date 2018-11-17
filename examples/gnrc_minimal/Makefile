@@ -14,6 +14,7 @@ BOARD_INSUFFICIENT_MEMORY := arduino-duemilanove arduino-uno nucleo-f031k6
 # development process:
 DEVELHELP ?= 1
 
+USEMODULE += cc1101
 # Include packages that pull up and auto-init the link layer.
 # NOTE: 6LoWPAN will be included if IEEE802.15.4 devices are present
 USEMODULE += gnrc_netdev_default
