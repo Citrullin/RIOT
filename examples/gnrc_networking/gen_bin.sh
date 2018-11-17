@@ -1,0 +1,1 @@
+arm-none-eabi-objcopy -O binary bin/bluepill/gnrc_networking.elf bin/bluepill/gnrc_networking.bin

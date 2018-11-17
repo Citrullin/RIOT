@@ -1,0 +1,1 @@
+st-flash --flash=128k write bin/bluepill/gnrc_networking.hex 0x8000000

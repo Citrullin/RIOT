@@ -1,0 +1,1 @@
+make flash STM32F103C8_FLASH_HACK=1 CPU_MODEL=stm32f103cb BOARD=bluepill
