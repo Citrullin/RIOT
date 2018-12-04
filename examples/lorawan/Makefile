@@ -2,7 +2,7 @@
 APPLICATION = lorawan
 
 # Use the ST B-L072Z-LRWAN1 board by default:
-BOARD ?= b-l072z-lrwan1
+BOARD ?= bluepill
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..

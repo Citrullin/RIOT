@@ -1,0 +1,2 @@
+USEMODULE += posix
+USEMODULE += pthread

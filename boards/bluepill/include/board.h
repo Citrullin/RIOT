@@ -34,6 +34,22 @@ extern "C" {
 #endif
 
 /**
+ * @name    sx1276 configuration
+ * @{
+ */
+#define SX127X_PARAM_SPI                    (SPI_DEV(2))
+#define SX127X_PARAM_SPI_NSS                GPIO_PIN(PORT_B, 12)
+
+#define SX127X_PARAM_RESET                  GPIO_PIN(PORT_A, 8)
+#define SX127X_PARAM_DIO0                   GPIO_PIN(PORT_B, 9)
+#define SX127X_PARAM_DIO1                   GPIO_PIN(PORT_A, 10)
+#define SX127X_PARAM_DIO2                   GPIO_PIN(PORT_B, 6)
+#define SX127X_PARAM_DIO3                   GPIO_PIN(PORT_B, 7)
+
+#define RADIO_TCXO_VCC_PIN                  GPIO_PIN(PORT_A, 12)
+/** @} */
+
+/**
  * @name   Macros for controlling the on-board LED.
  * @{
  */

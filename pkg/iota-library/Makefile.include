@@ -1,0 +1,1 @@
+INCLUDES += -L$(PKGDIRBASE)/iota-library/ -I$(PKGDIRBASE)/iota-library/src
