@@ -52,9 +52,9 @@ int tx_receiver(iota_wallet_tx_object_t * tx_object){
     puts("Value: ");
     printf("\n%li\n", (long int) tx_object->value);
     puts("currentIndex:");
-    printf("\n%li\n", tx_object->currentIndex);
+    printf("\n%li\n", (long int) tx_object->currentIndex);
     puts("lastIndex:");
-    printf("\n%li\n", tx_object->lastIndex);
+    printf("\n%li\n", (long int) tx_object->lastIndex);
     puts("Signature: ");
     puts(tx_object->signatureMessageFragment);
     puts("\n\n");
