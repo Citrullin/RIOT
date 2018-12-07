@@ -37,7 +37,7 @@ extern "C" {
  * baudrate to 9600 for this board
  * @{
  */
-#define UART_STDIO_BAUDRATE (9600U)
+#define STDIO_UART_BAUDRATE (9600U)
 /** @} */
 
 /**
@@ -57,6 +57,20 @@ extern "C" {
 #define LED0_ON             (PORTB |=  LED0_MASK)
 #define LED0_OFF            (PORTB &= ~LED0_MASK)
 #define LED0_TOGGLE         (PORTB ^=  LED0_MASK)
+/** @} */
+
+/**
+ * @name    Usage of LED to turn on when a kernel panic occurs.
+ * @{
+ */
+#define LED_PANIC           LED0_ON
+/** @} */
+
+/**
+ * @name CPU clock scale for arduino boards
+ *
+ */
+#define CPU_ATMEGA_CLK_SCALE_INIT    CPU_ATMEGA_CLK_SCALE_DIV1
 /** @} */
 
 /**

@@ -25,10 +25,9 @@ ifeq ($(BOARD),native)
   USEMODULE += lwip_ethernet
 endif
 
-include $(RIOTBASE)/Makefile.include
-
 # Test only implemented for native
-ifeq ($(BOARD),native)
-test:
-	./tests/01-run.py
+ifneq ($(BOARD),native)
+  TESTS=
 endif
+
+include $(RIOTBASE)/Makefile.include

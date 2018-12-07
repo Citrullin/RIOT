@@ -297,28 +297,14 @@ static int _init(netdev_t *netdev)
 
     assert(dev != NULL);
     dev->netdev.chan = IEEE802154_DEFAULT_CHANNEL;
-    dev->netdev.pan = IEEE802154_DEFAULT_PANID;
 
     return 0;
 }
 
 static int _get(netdev_t *netdev, netopt_t opt, void *value, size_t max_len)
 {
-    socket_zep_t *dev = (socket_zep_t *)netdev;
-    uint16_t *v = value;
-
-    assert((dev != NULL));
-    switch (opt) {
-        case NETOPT_MAX_PACKET_SIZE:
-            assert(value != NULL);
-            if (max_len != sizeof(uint16_t)) {
-                return -EOVERFLOW;
-            }
-            *v = SOCKET_ZEP_FRAME_PAYLOAD_LEN;
-            return sizeof(uint16_t);
-        default:
-            return netdev_ieee802154_get(&dev->netdev, opt, value, max_len);
-    }
+    assert(netdev != NULL);
+    return netdev_ieee802154_get((netdev_ieee802154_t *)netdev, opt, value, max_len);
 }
 
 static int _set(netdev_t *netdev, netopt_t opt, const void *value,

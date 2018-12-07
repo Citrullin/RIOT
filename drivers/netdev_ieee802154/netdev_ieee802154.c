@@ -63,6 +63,10 @@ void netdev_ieee802154_reset(netdev_ieee802154_t *dev)
 #elif MODULE_GNRC
     dev->proto = GNRC_NETTYPE_UNDEF;
 #endif
+
+    /* Initialize PAN ID and call netdev::set to propagate it */
+    dev->pan = IEEE802154_DEFAULT_PANID;
+    dev->netdev.driver->set(&dev->netdev, NETOPT_NID, &dev->pan, sizeof(dev->pan));
 }
 
 int netdev_ieee802154_get(netdev_ieee802154_t *dev, netopt_t opt, void *value,
@@ -151,6 +155,13 @@ int netdev_ieee802154_get(netdev_ieee802154_t *dev, netopt_t opt, void *value,
             res = sizeof(l2filter_t **);
             break;
 #endif
+        case NETOPT_MAX_PACKET_SIZE:
+            assert(max_len >= sizeof(int16_t));
+            *((uint16_t *)value) = (IEEE802154_FRAME_LEN_MAX -
+                                  IEEE802154_MAX_HDR_LEN) -
+                                  IEEE802154_FCS_LEN;
+            res = sizeof(uint16_t);
+            break;
         default:
             break;
     }

@@ -25,7 +25,8 @@ else
   USEMODULE += mtd_sdcard
 endif
 
-BOARD_INSUFFICIENT_MEMORY := msb-430 msb-430h nucleo-f031k6 telosb \
+BOARD_INSUFFICIENT_MEMORY := arduino-duemilanove arduino-uno \
+                             msb-430 msb-430h nucleo-f031k6 telosb \
                              wsn430-v1_3b wsn430-v1_4 z1
 
 # this list is composed of boards with sufficient memory and support spi/gpio + native
@@ -46,6 +47,8 @@ BOARD_WHITELIST := airfy-beacon arduino-due arduino-duemilanove arduino-mega2560
                    stm32f3discovery stm32f4discovery udoo waspmote-pro \
                    yunjia-nrf51822 native
 
+TEST_DEPS += image
+
 include $(RIOTBASE)/Makefile.include
 
 image:
@@ -54,6 +57,3 @@ image:
 #this generates a compressed fat image file that can be used by the fat driver on native
 compressed-image:
 	@./create_fat_image_file.sh $(FATFS_IMAGE_FILE_SIZE_MIB)
-
-test: image
-	./tests/01-run.py

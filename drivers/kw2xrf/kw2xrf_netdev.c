@@ -42,8 +42,6 @@
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
-#define _MAX_MHR_OVERHEAD           (25)
-
 #define _MACACKWAITDURATION         (864 / 16) /* 864us * 62500Hz */
 
 #define KW2XRF_THREAD_FLAG_ISR      (1 << 8)
@@ -260,14 +258,6 @@ int _get(netdev_t *netdev, netopt_t opt, void *value, size_t len)
     }
 
     switch (opt) {
-        case NETOPT_MAX_PACKET_SIZE:
-            if (len < sizeof(int16_t)) {
-                return -EOVERFLOW;
-            }
-
-            *((uint16_t *)value) = KW2XRF_MAX_PKT_LENGTH - _MAX_MHR_OVERHEAD;
-            return sizeof(uint16_t);
-
         case NETOPT_STATE:
             if (len < sizeof(netopt_state_t)) {
                 return -EOVERFLOW;
@@ -327,6 +317,13 @@ int _get(netdev_t *netdev, netopt_t opt, void *value, size_t len)
             *((netopt_enable_t *)value) =
                 !!(dev->netdev.flags & KW2XRF_OPT_AUTOCCA);
             return sizeof(netopt_enable_t);
+
+        case NETOPT_CHANNEL:
+            if (len < sizeof(uint16_t)) {
+                return -EOVERFLOW;
+            }
+            *((uint16_t *)value) = kw2xrf_get_channel(dev);
+            return sizeof(uint16_t);
 
         case NETOPT_TX_POWER:
             if (len < sizeof(int16_t)) {
@@ -430,8 +427,7 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *value, size_t len)
                     res = -EINVAL;
                     break;
                 }
-                dev->netdev.chan = chan;
-                /* don't set res to set netdev_ieee802154_t::chan */
+                res = sizeof(uint16_t);
             }
             break;
 
