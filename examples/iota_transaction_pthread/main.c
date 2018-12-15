@@ -113,6 +113,8 @@ bool print_status(iota_wallet_status_codes_t * status){
 void * run_thread(void * args){
     (void) args;
 
+    uint8_t security = 2;
+
     unsigned char seedBytes[48];
     chars_to_bytes(seedChars, seedBytes, 81);
 
@@ -123,8 +125,8 @@ void * run_thread(void * args){
     clear_addresses();
 
     pthread_mutex_lock(&seed_mutex);
-    iota_wallet_get_address(seedChars, 0, 2, address_from);
-    iota_wallet_get_address(seedChars, 1, 2, address_to);
+    iota_wallet_get_address(seedChars, 0, (unsigned int) security, address_from);
+    iota_wallet_get_address(seedChars, 1, (unsigned int) security, address_to);
     pthread_mutex_unlock(&seed_mutex);
 
     //Alias for txs buffer
@@ -150,7 +152,6 @@ void * run_thread(void * args){
 
     puts("Prepare transfer...");
 
-    uint8_t security = 2;
     iota_wallet_bundle_description_t bundle_description = {};
 
     pthread_mutex_lock(&seed_mutex);
