@@ -43,7 +43,7 @@ typedef struct {
 
 //char transaction_chars[2674];
 //char bundle_hash[81];
-int tx_receiver(iota_wallet_tx_object_t * tx_object){
+bool tx_receiver(iota_wallet_tx_object_t * tx_object){
     puts("\n");
     puts("Address: ");
     puts(tx_object->address);
@@ -58,14 +58,14 @@ int tx_receiver(iota_wallet_tx_object_t * tx_object){
     puts("Signature: ");
     puts(tx_object->signatureMessageFragment);
     puts("\n\n");
-    puts("raw transaction data:\n");
+    //puts("raw transaction data:\n");
     //iota_wallet_construct_raw_transaction_chars(transaction_chars,bundle_hash, tx_object);
     //puts(transaction_chars);
 
-    return 1;
+    return true;
 }
 
-int bundle_receiver(char * hash){
+bool bundle_receiver(char * hash){
     puts("HASH: ");
     puts("");
     //strcpy(bundle_hash, hash);
@@ -74,7 +74,7 @@ int bundle_receiver(char * hash){
     }
     puts("\n\n");
 
-    return 1;
+    return true;
 }
 
 char seedChars[] = "KNZ9GKOZS9TLPXKBHYUVWBZWSIGYZYRULTNDEBIIFAJEOADHCEYEQJPNIATEORDVQUBLIIGGBISRNQDDH";
@@ -90,6 +90,24 @@ static pthread_mutexattr_t seed_mutex_attr = {};
 void clear_addresses(void){
     memset(address_from, '9', 81);
     memset(address_to, '9', 81);
+}
+
+bool print_status(iota_wallet_status_codes_t * status){
+    puts("Returned status: ");
+    switch(*status){
+        case BUNDLE_CREATION_SUCCESS:
+            puts("BUNDLE_CREATION_SUCCESS");
+            break;
+        case BUNDLE_CREATION_TRANSACTION_RECEIVER_ERROR:
+            puts("BUNDLE_CREATION_TRANSACTION_RECEIVER_ERROR");
+            break;
+        case BUNDLE_CREATION_BUNDLE_RECEIVER_ERROR:
+            puts("BUNDLE_CREATION_BUNDLE_RECEIVER_ERROR");
+            break;
+    }
+    puts("\n");
+
+    return true;
 }
 
 void * run_thread(void * args){
@@ -149,7 +167,10 @@ void * run_thread(void * args){
     bundle_description.timestamp = 0;
 
     puts("Create tx bundle...");
-    iota_wallet_create_tx_bundle(&bundle_receiver, &tx_receiver, &bundle_description);
+    iota_wallet_status_codes_t status =
+            iota_wallet_create_tx_bundle(&bundle_receiver, &tx_receiver, &bundle_description);
+
+    print_status(&status);
 
     puts("Prepared Transfer.");
 
@@ -165,7 +186,7 @@ int init_mutex(void){
     return 1;
 }
 
-#define NUM_THREADS 2
+#define NUM_THREADS 1
 
 pthread_t threads[NUM_THREADS];
 int thread_args[NUM_THREADS];
