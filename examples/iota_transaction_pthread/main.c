@@ -31,35 +31,43 @@
 #include "pthread.h"
 
 typedef struct {
-    iota_wallet_tx_output_t txs[1];
+    iota_lib_tx_output_t txs[1];
     uint32_t length;
 } iota_txs_output_buffer_t;
 
 typedef struct {
-    iota_wallet_tx_input_t txs[1];
+    iota_lib_tx_input_t txs[1];
     uint32_t length;
 } iota_txs_input_buffer_t;
 
 
-//char transaction_chars[2674];
-//char bundle_hash[81];
-bool tx_receiver(iota_wallet_tx_object_t * tx_object){
+void print_number(char * string, uint32_t number){
+    for(unsigned int i = 0; i < number; i++){
+        printf("%c", string[i]);
+    }
+    puts("\n");
+}
+
+bool tx_receiver(iota_lib_tx_object_t * tx_object){
     puts("\n");
     puts("Address: ");
-    puts(tx_object->address);
+    print_number(tx_object->address, 81);
+    //puts(tx_object->address);
     puts("Tag: ");
-    puts(tx_object->tag);
+    //puts(tx_object->tag);
+    print_number(tx_object->tag, 27);
     puts("Value: ");
-    printf("\n%li\n", (long int) tx_object->value);
+    //printf("\n%li\n", (long int) tx_object->value);
     puts("currentIndex:");
     printf("\n%li\n", (long int) tx_object->currentIndex);
     puts("lastIndex:");
     printf("\n%li\n", (long int) tx_object->lastIndex);
     puts("Signature: ");
-    puts(tx_object->signatureMessageFragment);
+    //puts(tx_object->signatureMessageFragment);
+    print_number(tx_object->signatureMessageFragment, 2187);
     puts("\n\n");
     //puts("raw transaction data:\n");
-    //iota_wallet_construct_raw_transaction_chars(transaction_chars,bundle_hash, tx_object);
+    //iota_lib_construct_raw_transaction_chars(transaction_chars,bundle_hash, tx_object);
     //puts(transaction_chars);
 
     return true;
@@ -79,7 +87,6 @@ bool bundle_receiver(char * hash){
 
 char seedChars[] = "KNZ9GKOZS9TLPXKBHYUVWBZWSIGYZYRULTNDEBIIFAJEOADHCEYEQJPNIATEORDVQUBLIIGGBISRNQDDH";
 
-char address_from[81];
 char address_to[81];
 static pthread_mutex_t address_mutex = {};
 static pthread_mutexattr_t address_mutex_attr = {};
@@ -88,11 +95,10 @@ static pthread_mutex_t seed_mutex = {};
 static pthread_mutexattr_t seed_mutex_attr = {};
 
 void clear_addresses(void){
-    memset(address_from, '9', 81);
     memset(address_to, '9', 81);
 }
 
-bool print_status(iota_wallet_status_codes_t * status){
+bool print_status(iota_lib_status_codes_t * status){
     puts("Returned status: ");
     switch(*status){
         case BUNDLE_CREATION_SUCCESS:
@@ -125,34 +131,32 @@ void * run_thread(void * args){
     clear_addresses();
 
     pthread_mutex_lock(&seed_mutex);
-    iota_wallet_get_address(seedChars, 0, (unsigned int) security, address_from);
-    iota_wallet_get_address(seedChars, 1, (unsigned int) security, address_to);
+    iota_lib_get_address(seedChars, 1, (unsigned int) security, address_to);
     pthread_mutex_unlock(&seed_mutex);
 
     //Alias for txs buffer
-    iota_wallet_tx_output_t * txs_output = output_buffer.txs;
-    iota_wallet_tx_input_t * txs_input = input_buffer.txs;
+    iota_lib_tx_output_t * txs_output = output_buffer.txs;
+    iota_lib_tx_input_t * txs_input = input_buffer.txs;
 
     puts("Create IOTA transactions bundle...");
 
     //Define output
-    iota_wallet_tx_output_t * first_output = &txs_output[0];
+    iota_lib_tx_output_t * first_output = &txs_output[0];
     memcpy(first_output->address, address_to, 81);
     first_output->value = 10000;
 
 
     //Define the input array. Where the coins come from
-    iota_wallet_tx_input_t * first_input = &txs_input[0];
+    iota_lib_tx_input_t * first_input = &txs_input[0];
 
-    first_input->key_index = 0;
+    first_input->seed_address_index = 0;
     first_input->value = 10000;
-    memcpy(first_input->address, address_from, 81);
 
     pthread_mutex_unlock(&address_mutex);
 
     puts("Prepare transfer...");
 
-    iota_wallet_bundle_description_t bundle_description = {};
+    iota_lib_bundle_description_t bundle_description = {};
 
     pthread_mutex_lock(&seed_mutex);
     puts("Copy Seed...");
@@ -168,8 +172,8 @@ void * run_thread(void * args){
     bundle_description.timestamp = 0;
 
     puts("Create tx bundle...");
-    iota_wallet_status_codes_t status =
-            iota_wallet_create_tx_bundle(&bundle_receiver, &tx_receiver, &bundle_description);
+    iota_lib_status_codes_t status =
+            iota_lib_create_tx_bundle(&bundle_receiver, &tx_receiver, &bundle_description);
 
     print_status(&status);
 
@@ -198,7 +202,7 @@ int main(void)
     puts("IOTA Wallet Application");
     puts("=====================================");
 
-    iota_wallet_init();
+    iota_lib_init();
     init_mutex();
     //create all threads one by one
     for(int i = 0;i<NUM_THREADS; i++){
@@ -215,9 +219,6 @@ int main(void)
         assert(!result_code);
         printf("Thread %d has ended.\n",i+1);
     }
-
-    //iota_wallet_init();
-    //run_bundle_creation();
 
     return 0;
 }
