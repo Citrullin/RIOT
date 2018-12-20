@@ -55,7 +55,7 @@ bool tx_receiver(iota_lib_tx_object_t * tx_object){
     //puts(tx_object->address);
     puts("Tag: ");
     //puts(tx_object->tag);
-    print_number(tx_object->tag, 27);
+    print_number(tx_object->obsoleteTag, 27);
     puts("Value: ");
     //printf("\n%li\n", (long int) tx_object->value);
     puts("currentIndex:");
