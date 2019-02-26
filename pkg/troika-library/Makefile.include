@@ -1,0 +1,1 @@
+INCLUDES += -L$(PKGDIRBASE)/troika-library/ -I$(PKGDIRBASE)/troika-library/src
