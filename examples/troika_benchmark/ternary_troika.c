@@ -8,7 +8,7 @@ int BENCHMARK_TIMES = 1000;
 
 int run_hashing(void){
     // "This is some text." in tryte chars
-    const char tryte_chars_in[] = "CCWCXCGDEAXCGDEAGDCDADTCEAHDTCLDHDSA";
+    const char tryte_chars_in[] = "CCWCXCGDEAXCGDEAGDCDADTCEAHDTCLDHDSAEALB9DPCQC9DXCQCIDQCSARBKBRBKBRBVBKBIDDCOBNB";
 
     trit_t trit_in[3 * (sizeof(tryte_chars_in) - 1)];
 

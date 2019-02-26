@@ -8,7 +8,7 @@ int BENCHMARK_TIMES = 1000;
 
 int run_hashing(void){
     // "This is some text." in tryte chars
-    const unsigned char data[] = "This is some text.";
+    const unsigned char data[] = "This is some text. Blablibub.HAHAHLAuUED";
     unsigned char digest[384];
 
     SHA3_CTX ctx;
