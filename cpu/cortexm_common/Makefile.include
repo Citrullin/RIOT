@@ -15,6 +15,7 @@ ifneq (,$(ROM_START_ADDR)$(RAM_START_ADDR)$(ROM_LEN)$(RAM_LEN))
   LINKFLAGS += $(LINKFLAGPREFIX)--defsym=_ram_length=$(RAM_LEN)
 endif
 
+TOOLCHAINS_SUPPORTED = gnu llvm
 
 # Only define the linker symbol if the variable is set
 # The variable can be set using target specific variable thanks to lazy evaluation
@@ -23,3 +24,15 @@ endif
 LINKFLAGS += $(if $(ROM_OFFSET),$(LINKFLAGPREFIX)--defsym=_rom_offset=$(ROM_OFFSET))
 # FW_ROM_LEN: rom length to use for firmware linking. Allows linking only in a section of the rom.
 LINKFLAGS += $(if $(FW_ROM_LEN),$(LINKFLAGPREFIX)--defsym=_fw_rom_length=$(FW_ROM_LEN))
+
+
+# Configure riotboot bootloader and slot lengths
+# 4KB are currently enough
+RIOTBOOT_LEN ?= 0x1000
+# Currently 2 slots are supported by default, equals in length
+NUM_SLOTS ?= 2
+# Take the whole flash minus RIOTBOOT_LEN and divide it by NUM_SLOTS
+SLOT0_LEN ?= $(shell printf "0x%x" $$((($(ROM_LEN:%K=%*1024)-$(RIOTBOOT_LEN)) / $(NUM_SLOTS))))
+SLOT1_LEN ?= $(SLOT0_LEN)
+SLOT0_LEN := $(SLOT0_LEN)
+SLOT1_LEN := $(SLOT1_LEN)

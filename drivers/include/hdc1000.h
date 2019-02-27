@@ -10,6 +10,7 @@
 /**
  * @defgroup    drivers_hdc1000 HDC1000 Humidity and Temperature Sensor
  * @ingroup     drivers_sensors
+ * @ingroup     drivers_saul
  * @brief       Driver for the TI HDC1000 Humidity and Temperature Sensor
  *
  * The driver will initialize the sensor for best resolution (14 bit). Currently
@@ -25,6 +26,8 @@
  *
  * @note        The driver does currently not support using the devices heating
  *              unit.
+ *
+ * This driver provides @ref drivers_saul capabilities.
  *
  * @{
  *
@@ -158,8 +161,9 @@ int hdc1000_read(const hdc1000_t *dev, int16_t *temp, int16_t *hum);
  * @brief   Extended read function including caching capability
  *
  * This function will return cached values if they are within the sampling
- * period (HDC1000_RENEW_INTERVAL), or will trigger a new conversion, wait for
- * the conversion to be finished and the get the results from the device.
+ * period (HDC1000_PARAM_RENEW_INTERVAL), or will trigger a new conversion,
+ * wait for the conversion to be finished and the get the results from the
+ * device.
  *
  * @param[in]  dev          device descriptor of sensor
  * @param[out] temp         temperature [in 100 * degree centigrade]

@@ -25,6 +25,7 @@
 #include "cpu.h"
 #include "periph_conf.h"
 #include "periph_cpu.h"
+#include "mtd_sdcard.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -129,18 +130,17 @@ extern "C" {
 
 #define SX127X_PARAM_RESET                  GPIO_UNDEF
 
-#define SX127X_PARAM_DIOMULTI               XBEE1_INT_PIN       /* D24 */
+#define SX127X_PARAM_DIO0                   GPIO_UNDEF
 
-#define SX127X_PARAM_PASELECT               (SX127X_PA_RFO)
+#define SX127X_PARAM_DIO1                   GPIO_UNDEF
 
-#define SX127X_PARAMS                     { .spi       = SX127X_PARAM_SPI,     \
-                                            .nss_pin   = SX127X_PARAM_SPI_NSS, \
-                                            .reset_pin = SX127X_PARAM_RESET,   \
-                                            .dio0_pin  = SX127X_PARAM_DIOMULTI,\
-                                            .dio1_pin  = SX127X_PARAM_DIO1,    \
-                                            .dio2_pin  = SX127X_PARAM_DIO2,    \
-                                            .dio3_pin  = SX127X_PARAM_DIO3,    \
-                                            .paselect  = SX127X_PARAM_PASELECT }
+#define SX127X_PARAM_DIO2                   GPIO_UNDEF
+
+#define SX127X_PARAM_DIO3                   GPIO_UNDEF
+
+#define SX127X_PARAM_DIO_MULTI              XBEE1_INT_PIN       /* D24 */
+
+#define SX127X_PARAM_PASELECT               (SX127X_PA_BOOST)
 /** @} */
 
 /**
@@ -157,6 +157,38 @@ extern "C" {
  * @brief    TSL2561 Visible light sensor
  */
 #define TSL2561_PARAM_ADDR           TSL2561_ADDR_LOW
+
+/**
+ * @brief    BMP280 Pressure and temperature sensor
+ */
+#define BMX280_PARAM_I2C_ADDR        (0x76)
+
+#if defined(MODULE_MTD_SDCARD) || defined(DOXYGEN)
+/**
+ * @brief MTD device 0 (SD Card) definition. mtd0 is defined in board.c
+ * @{
+ */
+extern mtd_dev_t *mtd0;
+#define MTD_0 mtd0
+/** @} */
+
+/**
+ * @brief Attributes for the mtd_sdcard driver
+ * @{
+ */
+#ifndef MTD_SD_CARD_PAGE_SIZE
+#define MTD_SD_CARD_PAGE_SIZE           (512)
+#endif
+
+#ifndef MTD_SD_CARD_PAGES_PER_SECTOR
+#define MTD_SD_CARD_PAGES_PER_SECTOR    (128)
+#endif
+
+#ifndef MTD_SD_CARD_SECTOR_COUNT
+#define MTD_SD_CARD_SECTOR_COUNT        (3921920UL)
+#endif
+/** @} */
+#endif /* MODULE_MTD_SDCARD || DOXYGEN */
 
 /**
  * @brief   Initialize board specific hardware, including clock, LEDs and std-IO
