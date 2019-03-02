@@ -22,10 +22,6 @@
 #include "thread.h"
 #include "kernel_types.h"
 
-#ifdef MODULE_SCHEDSTATISTICS
-#include "xtimer.h"
-#endif
-
 #ifdef MODULE_TLSF_MALLOC
 #include "tlsf.h"
 #include "tlsf-malloc.h"
@@ -44,6 +40,7 @@ static const char *state_names[] = {
     [STATUS_FLAG_BLOCKED_ANY] = "bl anyfl",
     [STATUS_FLAG_BLOCKED_ALL] = "bl allfl",
     [STATUS_MBOX_BLOCKED] = "bl mbox",
+    [STATUS_COND_BLOCKED] = "bl cond",
 };
 
 /**
@@ -99,7 +96,7 @@ void ps(void)
         thread_t *p = (thread_t *)sched_threads[i];
 
         if (p != NULL) {
-            int state = p->status;                                                 /* copy state */
+            thread_state_t state = p->status;                                      /* copy state */
             const char *sname = state_names[state];                                /* get state name */
             const char *queued = &queued_name[(int)(state >= STATUS_ON_RUNQUEUE)]; /* get queued flag */
 #ifdef DEVELHELP

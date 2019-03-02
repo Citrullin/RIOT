@@ -7,7 +7,9 @@
  */
 
 /**
- * @ingroup net_gnrc_netif
+ * @defgroup    net_gnrc_netif_conf GNRC network interface configurations
+ * @ingroup     net_gnrc_netif
+ * @ingroup     config
  * @{
  *
  * @file
@@ -42,6 +44,17 @@ extern "C" {
  */
 #ifndef GNRC_NETIF_PRIO
 #define GNRC_NETIF_PRIO            (THREAD_PRIORITY_MAIN - 5)
+#endif
+
+/**
+ * @brief       Message queue size for network interface threads
+ *
+ * @attention   This has influence on the used stack memory of the thread, so
+ *              the thread's stack size might need to be adapted if this is
+ *              changed.
+ */
+#ifndef GNRC_NETIF_MSG_QUEUE_SIZE
+#define GNRC_NETIF_MSG_QUEUE_SIZE  (8U)
 #endif
 
 /**

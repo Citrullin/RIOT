@@ -37,9 +37,16 @@
 #include "xtimer.h"
 
 #define IEEE802154_MAX_FRAG_SIZE    (102)
+#define IEEE802154_LOCAL_EUI64     { \
+        0x02, 0x00, 0x00, 0xFF, 0xFE, 0x00, 0x00, 0x01 \
+    }
+#define IEEE802154_REMOTE_EUI64     { \
+        0x02, 0x00, 0x00, 0xFF, 0xFE, 0x00, 0x00, 0x02 \
+    }
 
-static char _netif_stack[THREAD_STACKSIZE_SMALL];
+static char _netif_stack[THREAD_STACKSIZE_DEFAULT];
 static netdev_test_t _ieee802154_dev;
+static const uint8_t _ieee802154_local_eui64[] = IEEE802154_LOCAL_EUI64;
 
 static int _get_netdev_device_type(netdev_t *netdev, void *value, size_t max_len)
 {
@@ -48,6 +55,15 @@ static int _get_netdev_device_type(netdev_t *netdev, void *value, size_t max_len
 
     *((uint16_t *)value) = NETDEV_TYPE_IEEE802154;
     return sizeof(uint16_t);
+}
+
+static int _get_netdev_proto(netdev_t *netdev, void *value, size_t max_len)
+{
+    assert(max_len == sizeof(gnrc_nettype_t));
+    (void)netdev;
+
+    *((gnrc_nettype_t *)value) = GNRC_NETTYPE_SIXLOWPAN;
+    return sizeof(gnrc_nettype_t);
 }
 
 static int _get_netdev_max_packet_size(netdev_t *netdev, void *value,
@@ -64,9 +80,18 @@ static int _get_netdev_src_len(netdev_t *netdev, void *value, size_t max_len)
 {
     (void)netdev;
     assert(max_len == sizeof(uint16_t));
-    *((uint16_t *)value) = sizeof(eui64_t);
+    *((uint16_t *)value) = sizeof(_ieee802154_local_eui64);
     return sizeof(uint16_t);
 }
+
+static int _get_netdev_addr_long(netdev_t *netdev, void *value, size_t max_len)
+{
+    (void)netdev;
+    assert(max_len >= sizeof(_ieee802154_local_eui64));
+    memcpy(value, _ieee802154_local_eui64, sizeof(_ieee802154_local_eui64));
+    return sizeof(_ieee802154_local_eui64);
+}
+
 
 static void _init_interface(void)
 {
@@ -75,12 +100,16 @@ static void _init_interface(void)
     netdev_test_setup(&_ieee802154_dev, NULL);
     netdev_test_set_get_cb(&_ieee802154_dev, NETOPT_DEVICE_TYPE,
                            _get_netdev_device_type);
-    netdev_test_set_get_cb(&_ieee802154_dev, NETOPT_MAX_PACKET_SIZE,
+    netdev_test_set_get_cb(&_ieee802154_dev, NETOPT_PROTO,
+                           _get_netdev_proto);
+    netdev_test_set_get_cb(&_ieee802154_dev, NETOPT_MAX_PDU_SIZE,
                            _get_netdev_max_packet_size);
     netdev_test_set_get_cb(&_ieee802154_dev, NETOPT_SRC_LEN,
                            _get_netdev_src_len);
+    netdev_test_set_get_cb(&_ieee802154_dev, NETOPT_ADDRESS_LONG,
+                           _get_netdev_addr_long);
     netif = gnrc_netif_ieee802154_create(
-            _netif_stack, THREAD_STACKSIZE_SMALL, GNRC_NETIF_PRIO,
+            _netif_stack, THREAD_STACKSIZE_DEFAULT, GNRC_NETIF_PRIO,
             "dummy_netif", (netdev_t *)&_ieee802154_dev);
     ipv6_addr_t addr = IPV6_ADDR_UNSPECIFIED;
 
@@ -106,8 +135,8 @@ static void _send_packet(void)
         uint8_t src[8];
         uint8_t dst[8];
     } netif_hdr = {
-        .src = { 0x02, 0x00, 0x00, 0xFF, 0xFE, 0x00, 0x00, 0x02 },
-        .dst = { 0x02, 0x00, 0x00, 0xFF, 0xFE, 0x00, 0x00, 0x01 },
+        .src = IEEE802154_REMOTE_EUI64,
+        .dst = IEEE802154_LOCAL_EUI64,
     };
 
     gnrc_netif_hdr_init(&(netif_hdr.netif_hdr), 8, 8);

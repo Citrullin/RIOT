@@ -1,7 +1,8 @@
 .PHONY: info-objsize info-buildsizes info-build info-boards-supported \
         info-features-missing info-modules info-cpu \
         info-features-provided info-features-required \
-        info-debug-variable-%
+        info-debug-variable-% info-toolchains-supported \
+        check-toolchain-supported
 
 info-objsize:
 	@case "$(SORTROW)" in \
@@ -12,7 +13,7 @@ info-objsize:
 	  "") SORTROW=4 ;; \
 	  *) echo "Usage: $(MAKE) info-objsize SORTROW=[text|data|bss|dec]" ; return ;; \
 	esac; \
-	echo -e '   text\t   data\t    bss\t    dec\t    hex\tfilename'; \
+	printf '   text\t   data\t    bss\t    dec\t    hex\tfilename\n'; \
 	$(SIZE) -d -B $(BASELIBS) | \
 	  tail -n+2 | \
 	  sed -e 's#$(BINDIR)##' | \
@@ -43,6 +44,7 @@ info-build:
 	@echo ''
 	@echo 'ELFFILE: $(ELFFILE)'
 	@echo 'HEXFILE: $(HEXFILE)'
+	@echo 'FLASHFILE: $(FLASHFILE)'
 	@echo ''
 	@echo 'FEATURES_REQUIRED (excl. optional features):'
 	@echo '         $(or $(sort $(filter-out $(FEATURES_OPTIONAL), $(FEATURES_REQUIRED))), -none-)'
@@ -130,3 +132,9 @@ info-features-missing:
 
 info-debug-variable-%:
 	@echo $($*)
+
+info-toolchains-supported:
+	@echo $(filter-out $(TOOLCHAINS_BLACKLIST),$(TOOLCHAINS_SUPPORTED))
+
+check-toolchain-supported:
+	@exit $(if $(filter $(TOOLCHAIN),$(filter-out $(TOOLCHAINS_BLACKLIST),$(TOOLCHAINS_SUPPORTED))),0,1)

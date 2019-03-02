@@ -51,17 +51,17 @@ static const i2c_conf_t i2c_config[] = {
  */
 static const spi_conf_t spi_config[] = {
     {
-        .dev      = SSI0,
-        .mosi_pin = GPIO_PD0,
-        .miso_pin = GPIO_PC4,
-        .sck_pin  = GPIO_PD1,
-        .cs_pin   = GPIO_PD3
+        .num      = 0,
+        .mosi_pin = GPIO_PIN(3, 0),
+        .miso_pin = GPIO_PIN(2, 4),
+        .sck_pin  = GPIO_PIN(3, 1),
+        .cs_pin   = GPIO_PIN(3, 3)
     },
     {
-        .dev      = SSI1,
-        .mosi_pin = GPIO_PC7,
-        .miso_pin = GPIO_PA4,
-        .sck_pin  = GPIO_PB5,
+        .num      = 1,
+        .mosi_pin = GPIO_PIN(2, 7),
+        .miso_pin = GPIO_PIN(0, 4),
+        .sck_pin  = GPIO_PIN(1 ,5),
         .cs_pin   = GPIO_UNDEF
     }
 };
@@ -73,7 +73,7 @@ static const spi_conf_t spi_config[] = {
  * @name ADC configuration
  * @{
  */
-#define SOC_ADC_ADCCON_REF  SOC_ADC_ADCCON_REF_AVDD5
+#define SOC_ADC_ADCCON3_EREF  SOC_ADC_ADCCON3_EREF_AVDD5
 
 static const adc_conf_t adc_config[] = {
     GPIO_PIN(0, 6), /**< GPIO_PA6 = ADC2_PIN */
