@@ -137,11 +137,11 @@ typedef enum {
 
 typedef struct {
     uint8_t SPI_BUS;
-    uint8_t CS_PIN;
+    gpio_t CS_PIN;
 
-    uint8_t COMMAND_CONTROL_PIN;
-    uint8_t RESET_PIN;
-    uint8_t BUSY_PIN;
+    gpio_t COMMAND_CONTROL_PIN;
+    gpio_t RESET_PIN;
+    gpio_t BUSY_PIN;
 
     epd_gdex_resolution resolution;
     epd_gdex_display_color_mode color_mode;

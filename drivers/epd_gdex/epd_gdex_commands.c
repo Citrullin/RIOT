@@ -7,8 +7,12 @@ typedef struct {
     uint8_t data;
 } epd_gdex_command;
 
-epd_gdex_command POWER_SETTING[1] = {
+epd_gdex_command PANEL_SETTING[1] = {
         { .command = false, .read = false, .data = 0x00 }
+};
+
+epd_gdex_command POWER_SETTING[1] = {
+        { .command = false, .read = false, .data = 0x01 }
 };
 
 epd_gdex_command POWER_ON[1] = {
@@ -65,4 +69,8 @@ epd_gdex_command TRES_SETTINGS[1] = {
 
 epd_gdex_command VCM_DC_SETTING[1] = {
         { .command = false, .read = false, .data = 0x82 }
+};
+
+epd_gdex_command PLL_CONTROL[1] = {
+        { .command = false, .read = false, .data = 0x30 }
 };
