@@ -98,3 +98,16 @@ If you'd like to learn more about the procedure please refer to
 
 * [Connecting devices to the router]: http://developer.nordicsemi.com/nRF5_IoT_SDK/doc/0.9.0/html/a00089.html
 * [Distributing a global IPv6 prefix]: http://developer.nordicsemi.com/nRF5_IoT_SDK/doc/0.9.0/html/a00090.html
+
+Troubeshooting
+
+hciconfig reset: Can't init device hci0: Operation not possible due to RF-kill
+
+Install rfkill. For example on debian based systems
+```bash
+apt-get install rfkill
+```
+
+```bash
+rfkill unblock all
+```
