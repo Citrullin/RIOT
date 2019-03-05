@@ -17,6 +17,7 @@ INCLUDES += $(NIMIBASE)/nimble/drivers/nrf52/include
 # include nimble host headers
 INCLUDES += $(NIMIBASE)/nimble/include
 INCLUDES += $(NIMIBASE)/nimble/host/include
+INCLUDES += $(NIMIBASE)/nimble/host/mesh/include
 INCLUDES += $(NIMIBASE)/nimble/host/services/ans/include
 INCLUDES += $(NIMIBASE)/nimble/host/services/bas/include
 INCLUDES += $(NIMIBASE)/nimble/host/services/bleuart/include

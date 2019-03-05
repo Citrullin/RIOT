@@ -23,6 +23,7 @@ endif
 all: git-download
 	"$(MAKE)" -C $(PDIR)/ext/tinycrypt/src/ -f $(TDIR)/ext.tinycrypt.mk
 	"$(MAKE)" -C $(PDIR)/nimble/host/src/ -f $(TDIR)/nimble.host.mk
+	"$(MAKE)" -C $(PDIR)/nimble/host/mesh/src/ -f $(TDIR)/nimble.host.mesh.mk
 	"$(MAKE)" -C $(PDIR)/nimble/host/services/gap/src/ -f $(TDIR)/service.gap.mk
 	"$(MAKE)" -C $(PDIR)/nimble/host/services/gatt/src/ -f $(TDIR)/service.gatt.mk
 	"$(MAKE)" -C $(PDIR)/nimble/host/util/src/ -f $(TDIR)/nimble.host.util.mk
