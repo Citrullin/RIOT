@@ -29,7 +29,11 @@
 #include "nimble/ble.h"
 #include "host/ble_hs.h"
 #include "services/gap/ble_svc_gap.h"
+#include "mesh/mesh.h"
 #include "mesh/glue.h"
+#include "mesh/cfg_srv.h"
+#include "mesh/access.h"
+#include "mesh/health_srv.h"
 
 #define BT_DBG_ENABLED (MYNEWT_VAL(BLE_MESH_DEBUG))
 

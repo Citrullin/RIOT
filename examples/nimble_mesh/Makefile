@@ -16,6 +16,8 @@ USEPKG += nimble
 # We also use the AD part of the BLE helper module
 USEMODULE += bluetil_ad
 
+CFLAGS += -Wno-unused-parameter -Wno-unused-variable -Wno-override-init
+
 # Comment this out to disable code in RIOT that does safety checking
 # which is not needed in a production environment but helps in the
 # development process:
