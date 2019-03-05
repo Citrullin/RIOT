@@ -15,5 +15,6 @@ SRC += ble_ll.c
 SRC += ble_ll_scan.c
 SRC += ble_ll_dtm.c
 SRC += ble_ll_hci_ev.c
+SRC += ble_ll_utils.c
 
 include $(RIOTBASE)/Makefile.base

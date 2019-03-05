@@ -21,6 +21,7 @@ SRC += ble_hs_hci_evt.c
 SRC += ble_hs_hci_util.c
 SRC += ble_hs_id.c
 SRC += ble_hs_log.c
+SRC += ble_hs_stop.c
 SRC += ble_hs_mbuf.c
 SRC += ble_hs_mqueue.c
 SRC += ble_hs_misc.c

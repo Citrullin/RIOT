@@ -1,6 +1,6 @@
 PKG_NAME    = nimble
-PKG_URL     = https://github.com/apache/mynewt-nimble.git
-PKG_VERSION = ef58876024218e488dcbc15c8631db016241ab1f
+PKG_URL     = https://github.com/Citrullin/mynewt-nimble
+PKG_VERSION = 631be9943a6caa395588bbd9c2b55dba09b96d9a
 PKG_LICENSE = Apache-2.0
 
 TDIR = $(RIOTPKG)/$(PKG_NAME)
@@ -15,7 +15,7 @@ ifeq (llvm,$(TOOLCHAIN))
 # tell LLVM/clang not to be so pedantic with this.
   CFLAGS += -Wno-unused-function
 else
-  CFLAGS += -Wno-unused-but-set-variable
+  CFLAGS += -Wno-unused-but-set-variable -Wno-aggressive-loop-optimizations -Wno-format-nonliteral
 endif
 
 .PHONY: all

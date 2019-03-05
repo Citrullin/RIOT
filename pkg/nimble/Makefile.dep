@@ -9,6 +9,7 @@ USEMODULE += nimble_riot_contrib
 # nimble sub-modules that we build
 USEMODULE += nimble_tinycrypt
 USEMODULE += nimble_host
+USEMODULE += nimble_mesh
 USEMODULE += nimble_host_services_gap
 USEMODULE += nimble_host_services_gatt
 USEMODULE += nimble_host_util
