@@ -15,9 +15,11 @@ uint8_t gpio_util_shiftin(gpio_t data_pin, gpio_t clock_pin){
 
     for(unsigned int i = 8; i > 0; i--) {
         gpio_set(clock_pin);
-        if(gpio_read(data_pin) > 0){
+
+        if(gpio_read(data_pin) > 0) {
             byte |= (1 << (i - 1));
         }
+
         gpio_clear(clock_pin);
     }
 
