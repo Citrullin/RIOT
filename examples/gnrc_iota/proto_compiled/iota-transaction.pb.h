@@ -18,7 +18,7 @@ extern "C" {
 typedef struct _IotaTransactionMessage {
     pb_callback_t signatureMessageFragment;
     pb_callback_t address;
-    uint64_t value;
+    int64_t value;
     pb_callback_t obsoleteTag;
     uint32_t timestamp;
     uint32_t currentIndex;
@@ -44,7 +44,7 @@ typedef struct _IotaTransactionMessage {
 #define IotaTransactionMessage_FIELDLIST(X, a) \
 X(a, CALLBACK, REQUIRED, BYTES, signatureMessageFragment, 1) \
 X(a, CALLBACK, REQUIRED, BYTES, address, 2) \
-X(a, STATIC, REQUIRED, FIXED64, value, 3) \
+X(a, STATIC, REQUIRED, SFIXED64, value, 3) \
 X(a, CALLBACK, REQUIRED, BYTES, obsoleteTag, 4) \
 X(a, STATIC, REQUIRED, FIXED32, timestamp, 5) \
 X(a, STATIC, REQUIRED, FIXED32, currentIndex, 6) \

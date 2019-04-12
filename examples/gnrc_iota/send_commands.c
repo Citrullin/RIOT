@@ -13,19 +13,14 @@
 
 #include "pthread.h"
 
-#include "proto_compiled/DataRequest.pb.h"
-#include "proto_compiled/DataResponse.pb.h"
-#include "proto_compiled/FeatureResponse.pb.h"
+//IOTA
+#include "iota/kerl.h"
+#include "iota/conversion.h"
+#include "iota/addresses.h"
+#include "iota/transfers.h"
 
-/**
- * Log structure:
- * LEVEL | FUNCTION_NAME | TYPE | KEY: VALUE
- *
- * LEVEL => ERROR, INFO, DEBUG
- * FUNCTION_NAME => the string name of the calling function
- * TYPE => string, bool, env_sensor_rpc_command_t etc.
- * KEY => variable name or struct
- */
+#include "proto_compiled/iota-transaction.pb.h"
+
 
 //Todo: Use macros to generate debug code.
 #define DEBUG_SERVER true
@@ -33,301 +28,161 @@
 #define PORT 51037
 #define MAXLINE 1000
 
-uint32_t status_received_packets_successful = 0;
-uint32_t status_received_packets_error = 0;
-uint32_t status_send_packets = 0;
+extern int encode_iota_transaction_message(IotaTransactionMessage * message_ptr);
 
-uint8_t encode_buffer[500];
-size_t encode_buffer_length;
+typedef struct {
+    iota_wallet_tx_output_t txs[1];
+    uint32_t length;
+} iota_txs_output_buffer_t;
 
-void clear_encode_buffer(void) {
-    memset(encode_buffer, 0, sizeof(encode_buffer));
-    encode_buffer_length = 0;
+typedef struct {
+    iota_wallet_tx_input_t txs[1];
+    uint32_t length;
+} iota_txs_input_buffer_t;
+
+extern int sock;
+int addr_len;
+struct sockaddr_in6 client_addr;
+struct sockaddr_in6 server_addr = {.sin6_addr = IPV6_ADDR_UNSPECIFIED};
+
+
+IotaTransactionMessage iota_transaction_message;
+iota_wallet_tx_object_t * wallet_tx_object;
+
+int tx_receiver(iota_wallet_tx_object_t * tx_object){
+
+    wallet_tx_object = tx_object;
+
+    puts("\n");
+    puts("Address: ");
+    puts(tx_object->address);
+    puts("Tag: ");
+    puts(tx_object->tag);
+    puts("Value: ");
+    printf("\n%li\n", (long int) tx_object->value);
+    puts("currentIndex:");
+    printf("\n%li\n", tx_object->currentIndex);
+    puts("lastIndex:");
+    printf("\n%li\n", tx_object->lastIndex);
+    puts("Signature: ");
+    puts(tx_object->signatureMessageFragment);
+    puts("\n\n");
+
+    iota_transaction_message.value = tx_object->value;
+    iota_transaction_message.currentIndex = tx_object->currentIndex;
+    iota_transaction_message.lastIndex = tx_object->lastIndex;
+    iota_transaction_message.timestamp = 0;
+
+    encode_iota_transaction_message(&iota_transaction_message);
+
+    return 1;
 }
 
-#define SOCKET_BUFFER_SIZE 500
-uint8_t socket_buffer[SOCKET_BUFFER_SIZE];
-size_t socket_buffer_length;
+int bundle_receiver(char * hash){
+    puts("HASH: ");
+    puts("");
 
-void clear_socket_buffer(void) {
-    memset(socket_buffer, 0, sizeof(socket_buffer));
-    socket_buffer_length = 0;
-}
-
-environmentSensors_FeatureResponse sensor_node_features = {
-        .hasTemperature = true,
-        .hasAtmosphericPressure = false,
-        .hasHumanity = true,
-        .hasPm2_5 = false,
-};
-
-//Logging
-extern void log_int(char *level, char *func_name, char *key, int value);
-
-extern void log_string(char *level, char *func_name, char *key, char *value);
-
-extern void log_hex(char *level, char *func_name, char *key, uint8_t value);
-
-extern void log_addr(char *level, char *func_name, char *key, struct sockaddr_in6 *client_addr);
-
-extern void log_hex_array(char *level, char *func_name, char *key, uint8_t *value, size_t length);
-
-//Encode
-extern int env_sensor_data_response_encode(
-        uint8_t *buffer, size_t buffer_size, environmentSensors_DataResponse *message_ptr);
-
-extern int env_sensor_feature_response_encode(uint8_t *buffer, size_t buffer_size,
-                                              environmentSensors_FeatureResponse *message_ptr);
-
-
-//Decode
-extern int env_sensor_data_request_decode(
-        environmentSensors_DataRequest *message_ptr,
-        uint8_t *encoded_msg_ptr, size_t decoded_msg_size);
-
-extern int env_sensor_feature_request_decode(
-        environmentSensors_FeatureResponse *message_ptr,
-        uint8_t *encoded_msg_ptr, size_t decoded_msg_size);
-
-
-typedef enum {
-    FEATURE_REQUEST_CMD,
-    FEATURE_RESPONSE_CMD,
-    DATA_REQUEST_CMD,
-    DATA_RESPONSE_CMD,
-    ERROR_RESPONSE_CMD,
-    SETUP_TEST_CMD,
-    NONE_MESSAGE
-} env_sensor_rpc_command_t;
-
-env_sensor_rpc_command_t get_env_sensor_rpc_command(uint8_t type) {
-    switch (type) {
-        case 33:
-            return FEATURE_REQUEST_CMD;
-        case 34:
-            return DATA_REQUEST_CMD;
-        case 35:
-            return DATA_RESPONSE_CMD;
-        case 36:
-            return FEATURE_RESPONSE_CMD;
-        case 88:
-            return SETUP_TEST_CMD;
-        default:
-            return NONE_MESSAGE;
+    for(int i = 0; i < 81; i++){
+        printf("%c", hash[i]);
     }
+    puts("\n\n");
+
+    return 1;
 }
 
-uint8_t get_env_sensor_rpc_command_byte(env_sensor_rpc_command_t command) {
-    switch (command) {
-        case FEATURE_REQUEST_CMD:
-            return 33;
-        case DATA_REQUEST_CMD:
-            return 34;
-        case DATA_RESPONSE_CMD:
-            return 35;
-        case FEATURE_RESPONSE_CMD:
-            return 36;
-        default:
-            return 0;
-    }
+char seedChars[] = "KNZ9GKOZS9TLPXKBHYUVWBZWSIGYZYRULTNDEBIIFAJEOADHCEYEQJPNIATEORDVQUBLIIGGBISRNQDDH";
+
+char address_from[81];
+char address_to[81];
+
+static pthread_mutex_t address_mutex = {};
+static pthread_mutexattr_t address_mutex_attr = {};
+
+static pthread_mutex_t seed_mutex = {};
+static pthread_mutexattr_t seed_mutex_attr = {};
+
+int init_mutex(void){
+    pthread_mutex_init(&address_mutex, &address_mutex_attr);
+    pthread_mutex_init(&seed_mutex, &seed_mutex_attr);
+
+    return 1;
 }
 
-int get_env_sensor_rpc_command_name(char *result, env_sensor_rpc_command_t command) {
-    switch (command) {
-        case FEATURE_REQUEST_CMD:
-            strcat(result, "FEATURE_REQUEST_CMD");
-            break;
-        case DATA_REQUEST_CMD:
-            strcat(result, "DATA_REQUEST_CMD");
-            break;
-        case DATA_RESPONSE_CMD:
-            strcat(result, "DATA_RESPONSE_CMD");
-            break;
-        case FEATURE_RESPONSE_CMD:
-            strcat(result, "DATA_RESPONSE_CMD");
-            break;
-        default:
-            strcat(result, "NONE_CMD");
-    }
-
-    return 0;
+void clear_addresses(void){
+    memset(address_from, '9', 81);
+    memset(address_to, '9', 81);
 }
 
-void send_buffer(int sock, struct sockaddr_in6 *client_addr_ptr) {
-    if (DEBUG_SERVER) {
-        log_addr("DEBUG", "send_buffer", "client_addr", client_addr_ptr);
-    }
-
-    status_send_packets += 1;
-    sendto(
-            sock, encode_buffer, encode_buffer_length, 0,
-            (struct sockaddr *) client_addr_ptr, sizeof(struct sockaddr_in6));
-}
-
-void handle_env_sensor_feature_request(int sock, struct sockaddr_in6 *client_addr_ptr) {
-    clear_encode_buffer();
-
-    encode_buffer[0] = get_env_sensor_rpc_command_byte(FEATURE_RESPONSE_CMD);
-    encode_buffer_length = 1;
-
-    encode_buffer_length +=
-            env_sensor_feature_response_encode(
-                    &encode_buffer[1], sizeof(encode_buffer) - 1, &sensor_node_features);
-
-    send_buffer(sock, client_addr_ptr);
-}
-
-
-extern void sensors_read_values(void);
-extern environmentSensors_SingleDataPoint * sensors_get_temp_value(void);
-extern environmentSensors_SingleDataPoint * sensors_get_hum_value(void);
-
-void handle_env_sensor_data_request(int sock, struct sockaddr_in6 *client_addr_ptr) {
-    clear_encode_buffer();
-    sensors_read_values();
-
-    encode_buffer[0] = get_env_sensor_rpc_command_byte(DATA_RESPONSE_CMD);
-    encode_buffer_length = 1;
-
-    environmentSensors_SingleDataPoint * temp_data_point = sensors_get_temp_value();
-    environmentSensors_SingleDataPoint * hum_data_point = sensors_get_hum_value();
-
-    environmentSensors_DataResponse dataResponse;
-    dataResponse.has_temperature = true;
-    dataResponse.temperature = *temp_data_point;
-    dataResponse.has_humanity = true;
-    dataResponse.humanity = *hum_data_point;
-
-    encode_buffer_length +=
-            env_sensor_data_response_encode(
-                    &encode_buffer[1], sizeof(encode_buffer) - 1, &dataResponse);
-
-    send_buffer(sock, client_addr_ptr);
-}
-
-void add_incoming_message_to_status(env_sensor_rpc_command_t *command) {
-    switch (*command) {
-        case FEATURE_REQUEST_CMD:
-            status_received_packets_successful += 1;
-            break;
-        default:
-            status_received_packets_error += 1;
-            break;
-    }
-}
-
-void handle_incoming_message(int sock, struct sockaddr_in6 *client_addr_ptr) {
-    char func_name[] = "handle_incoming_message";
-
-    env_sensor_rpc_command_t message_command = get_env_sensor_rpc_command(socket_buffer[0]);
-
-    if (DEBUG_SERVER) {
-        log_hex("DEBUG", func_name, "hex_command", (uint8_t) socket_buffer[0]);
-        char command_name[30] = "";
-        get_env_sensor_rpc_command_name(command_name, message_command);
-        log_string("DEBUG", func_name, "command_name", command_name);
-        log_int("DEBUG", func_name, "client_port", ntohs(client_addr_ptr->sin6_port));
-        log_addr("DEBUG", func_name, "client_addr", client_addr_ptr);
-    }
-    add_incoming_message_to_status(&message_command);
-
-    switch (message_command) {
-        case FEATURE_REQUEST_CMD:
-            handle_env_sensor_feature_request(sock, client_addr_ptr);
-            break;
-        case DATA_REQUEST_CMD:
-            handle_env_sensor_data_request(sock, client_addr_ptr);
-            break;
-        default:
-            log_hex("ERROR", func_name, "hex_command", (uint8_t) socket_buffer[0]);
-            log_addr("ERROR", func_name, "client_addr", client_addr_ptr);
-            break;
-    }
-}
-
-bool initialized_server;
-bool server_is_running;
-int server_socket;
-
-extern void sensors_init(void);
-
-void server_init(struct sockaddr_in6 *server_addr, size_t server_addr_size) {
-    sensors_init();
-
-    memset(server_addr, 0, server_addr_size);
-    server_addr->sin6_family = AF_INET6;
-    server_addr->sin6_port = htons(PORT);
-    server_addr->sin6_scope_id = 0;
-
-    if (DEBUG_SERVER) {
-        log_addr("DEBUG", "server_init", "server_addr", server_addr);
-        log_int("DEBUG", "server_init", "server_port", ntohs(server_addr->sin6_port));
-    }
-
-    if ((server_socket = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-        log_int("ERROR", "server_init", "server_socket", server_socket);
-    }
-
-    if (bind(server_socket, (struct sockaddr *) server_addr, server_addr_size) < 0) {
-        log_string("ERROR", "server_init", "bind_server_socket", "bind failed");
-    }
-
-    initialized_server = true;
-    server_is_running = true;
-}
-
-
-void server_start_listening(void) {
-    unsigned int client_addr_len = sizeof(struct sockaddr_in6);
-    struct sockaddr_in6 client_addr;
-
-    while (server_is_running) {
-        clear_socket_buffer();
-        int length = recvfrom(server_socket, socket_buffer, sizeof(socket_buffer) - 1, 0,
-                              (struct sockaddr *) &client_addr,
-                              &client_addr_len);
-
-        if (length < 0) {
-            log_int("ERROR", "server_start_listening", "recvfrom", length);
-            break;
-        }
-        socket_buffer[length] = '\0';
-        socket_buffer_length = length;
-
-        if (server_is_running) {
-            handle_incoming_message(server_socket, &client_addr);
-        } else {
-            clear_socket_buffer();
-        }
-    }
-}
-
-void server_stop(void) {
-    server_is_running = false;
-    status_received_packets_error = 0;
-    status_received_packets_successful = 0;
-    status_send_packets = 0;
-}
-
-void server_status(void) {
-    //Todo: Rethink it. Maybe return a struct instead. Log instead in shell_cmds
-    printf("Received %lu correct packets\n", status_received_packets_successful);
-    printf("Received %lu incorrect packets\n", status_received_packets_error);
-    printf("Send %lu packets\n", status_send_packets);
-}
-
-bool is_server_running(void) {
-    return server_is_running;
-}
-
-void *run_server_thread(void *args) {
+void *run_send_thread(void *args) {
     (void) args;
 
-    struct sockaddr_in6 server_addr = {.sin6_addr = IPV6_ADDR_UNSPECIFIED};
-    server_init(&server_addr, sizeof(server_addr));
-    server_start_listening();
+    unsigned char seedBytes[48];
+    chars_to_bytes(seedChars, seedBytes, 81);
+
+    iota_txs_output_buffer_t output_buffer = {};
+    iota_txs_input_buffer_t input_buffer = {};
+
+    pthread_mutex_lock(&address_mutex);
+    clear_addresses();
+
+    pthread_mutex_lock(&seed_mutex);
+    iota_wallet_get_address(seedChars, 0, 2, address_from);
+    iota_wallet_get_address(seedChars, 1, 2, address_to);
+    pthread_mutex_unlock(&seed_mutex);
+
+    //Alias for txs buffer
+    iota_wallet_tx_output_t * txs_output = output_buffer.txs;
+    iota_wallet_tx_input_t * txs_input = input_buffer.txs;
+
+    puts("Create IOTA transactions bundle...");
+
+    //Define output
+    iota_wallet_tx_output_t * first_output = &txs_output[0];
+    memcpy(first_output->address, address_to, 81);
+    first_output->value = 10000;
+
+
+    //Define the input array. Where the coins come from
+    iota_wallet_tx_input_t * first_input = &txs_input[0];
+
+    first_input->key_index = 0;
+    first_input->value = 10000;
+    memcpy(first_input->address, address_from, 81);
+
+    pthread_mutex_unlock(&address_mutex);
+
+    puts("Prepare transfer...");
+
+    uint8_t security = 2;
+    iota_wallet_bundle_description_t bundle_description = {};
+
+    pthread_mutex_lock(&seed_mutex);
+    puts("Copy Seed...");
+    memcpy(bundle_description.seed, seedChars, 81);
+    pthread_mutex_unlock(&seed_mutex);
+
+    puts("Create bundle description...");
+    bundle_description.security = security;
+    bundle_description.output_txs = output_buffer.txs;
+    bundle_description.output_txs_length = 1;
+    bundle_description.input_txs = input_buffer.txs;
+    bundle_description.input_txs_length = 1;
+    bundle_description.timestamp = 0;
+
+    puts("Create tx bundle...");
+    iota_wallet_create_tx_bundle(&bundle_receiver, &tx_receiver, &bundle_description);
+
+    puts("Prepared Transfer.");
+
+    puts("DONE.");
+
     int value = 0;
-    close(server_socket);
+
     pthread_exit(&value);
     return 0;
 }
+
+#define NUM_THREADS 2
+
+pthread_t threads[NUM_THREADS];
+int thread_args[NUM_THREADS];

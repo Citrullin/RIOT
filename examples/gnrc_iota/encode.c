@@ -7,17 +7,20 @@
 #include "pb_decode.h"
 #include "pb_encode.h"
 
+#include "iota/transfers.h"
+
 #include "proto_compiled/iota-transaction.pb.h"
 
-uint8_t encode_buffer[128];
+uint8_t encode_buffer[5000];
 size_t encode_message_length;
 bool encode_status;
 
-
+extern iota_wallet_tx_object_t * wallet_tx_object;
 
 bool write_signature_message_fragment(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
 {
-    char *str = tx_object.signatureMessageFragment;
+    (void) arg;
+    char *str = wallet_tx_object->signatureMessageFragment;
     if (!pb_encode_tag_for_field(stream, field))
         return false;
 
@@ -26,7 +29,8 @@ bool write_signature_message_fragment(pb_ostream_t *stream, const pb_field_t *fi
 
 bool write_address(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
 {
-    char *str = tx_object.address;
+    (void) arg;
+    char *str = wallet_tx_object->address;
     if (!pb_encode_tag_for_field(stream, field))
         return false;
 
@@ -35,7 +39,8 @@ bool write_address(pb_ostream_t *stream, const pb_field_t *field, void * const *
 
 bool write_obsoleteTag(pb_ostream_t *stream, const pb_field_t *field, void * const *arg)
 {
-    char *str = tx_object.obsoleteTag;
+    (void) arg;
+    char *str = wallet_tx_object->obsoleteTag;
     if (!pb_encode_tag_for_field(stream, field))
         return false;
 
@@ -44,16 +49,16 @@ bool write_obsoleteTag(pb_ostream_t *stream, const pb_field_t *field, void * con
 
 int encode_iota_transaction_message(IotaTransactionMessage * message_ptr) {
     pb_callback_t address_callback;
-    address_callback.encode = write_address;
+    address_callback.funcs.encode = &write_address;
     message_ptr->address = address_callback;
 
     pb_callback_t signature_message_fragment_callback;
-    signature_message_fragment_callback.encode = write_address;
-    message_ptr->address = signature_message_fragment_callback;
+    signature_message_fragment_callback.funcs.encode = &write_signature_message_fragment;
+    message_ptr->signatureMessageFragment = signature_message_fragment_callback;
 
     pb_callback_t obsoleteTag_callback;
-    obsoleteTag_callback.encode = write_address;
-    message_ptr->address = obsoleteTag_callback;
+    obsoleteTag_callback.funcs.encode = &write_obsoleteTag;
+    message_ptr->obsoleteTag = obsoleteTag_callback;
 
     pb_ostream_t stream = pb_ostream_from_buffer(encode_buffer, sizeof(encode_buffer));
 
@@ -71,7 +76,7 @@ int encode_iota_transaction_message(IotaTransactionMessage * message_ptr) {
 
 int send_iota_transaction_message(
         IotaTransactionMessage * message_ptr, int socket, struct sockaddr_in6 * client_addr_ptr){
-    encode_test_message(message_ptr);
+    encode_iota_transaction_message(message_ptr);
     sendto(
             socket, encode_buffer, sizeof(encode_buffer), 0,
             (struct sockaddr *)client_addr_ptr, sizeof(struct sockaddr_in6));
