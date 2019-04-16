@@ -33,10 +33,10 @@ extern "C" {
  * @{
  */
 #ifndef SDS011_PARAM_UART_DEV
-#define SDS011_PARAM_UART_DEV       (UART_DEV(1))
+#define SDS011_PARAM_UART_DEV       (UART_DEV(2))
 #endif
 #ifndef SDS011_PARAM_PWR_PIN
-#define SDS011_PARAM_PWR_PIN        (GPIO_PIN(0, 0))
+#define SDS011_PARAM_PWR_PIN        (GPIO_PIN(1, 1))
 #endif
 #ifndef SDS011_PARAM_PWR_PIN_AH
 #define SDS011_PARAM_PWR_PIN_AH     (true)
