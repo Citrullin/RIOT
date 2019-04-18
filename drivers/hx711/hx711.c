@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Philipp-Alexander Blum <philipp-blum@jakiku.de>
+ * Copyright (C) 2019 Philipp-Alexander Blum <philipp-blum@jakiku.de>
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -19,37 +19,42 @@
  */
 
 #include "periph/gpio.h"
-#include "advanced_io.h"
+#include "periph/gpio_util.h"
+#include "xtimer.h"
 
-int HX711_SCK = GPIO_PIN(1, 13);
-int HX711_DOUT =  GPIO_PIN(1, 14);
-uint8_t HX711_GAIN = 1;
-float HX711_OFFSET = 0.0f;
-float HX711_SCALE = 1.0f;
+#include "hx711.h"
+#include "hx711_params.h"
 
-void yield(void) {};
-
-bool hx711_is_ready(void) {
-    return gpio_read(HX711_DOUT) == 0;
+/**
+ * @brief Needs to wait for device to be ready while initialization
+ */
+void wait_for_ready(void)
+{
+    while(gpio_read(HX711_PARAM_DOUT) > 0){
+        xtimer_usleep(HX711_PARAM_SLEEP_TIME);
+    }
 }
 
-float hx711_read(void){
-    while (!hx711_is_ready()) {
-        yield();
-    }
+/**
+ * @brief Gets a single 24-Bit value from the HX711.
+ * @return The 24-Bit shift in value
+ */
+int32_t hx711_read(void)
+{
+    wait_for_ready();
 
     float value = 0;
     uint8_t data[3];
     uint8_t fill_byte = 0x00;
 
-    data[2] = advanced_io_shift_in(HX711_DOUT, HX711_SCK, MSBFIRST);
-    data[1] = advanced_io_shift_in(HX711_DOUT, HX711_SCK, MSBFIRST);
-    data[0] = advanced_io_shift_in(HX711_DOUT, HX711_SCK, MSBFIRST);
+    data[2] = gpio_util_shiftin(HX711_PARAM_DOUT, HX711_PARAM_SCK);
+    data[1] = gpio_util_shiftin(HX711_PARAM_DOUT, HX711_PARAM_SCK);
+    data[0] = gpio_util_shiftin(HX711_PARAM_DOUT, HX711_PARAM_SCK);
 
 
-    for (int i = 0; i < HX711_GAIN; i++) {
-        gpio_set(HX711_SCK);
-        gpio_clear(HX711_SCK);
+    for (int i = 0; i < HX711_PARAM_GAIN_PULSES; i++) {
+        gpio_set(HX711_PARAM_SCK);
+        gpio_clear(HX711_PARAM_SCK);
     }
 
 
@@ -64,89 +69,59 @@ float hx711_read(void){
               | (unsigned long)(data[1]) << 8
               | (unsigned long)(data[0]) );
 
-    return (float)(value);
+    return (int32_t) value;
 }
 
+void hx711_init(void)
+{
+    gpio_init(HX711_PARAM_SCK, GPIO_OUT);
+    gpio_init(HX711_PARAM_DOUT, GPIO_IN);
 
-void hx711_set_gain(uint8_t gain){
-    switch (gain) {
-        case 128:
-            HX711_GAIN = 1;
-            break;
-        case 64:
-            HX711_GAIN = 3;
-            break;
-        case 32:
-            HX711_GAIN = 2;
-            break;
-    }
-
-    gpio_clear(HX711_SCK);
+    gpio_clear(HX711_PARAM_SCK);
     hx711_read();
 }
 
-void hx711_set_sck(int sck){
-    HX711_SCK = sck;
-}
-
-void hx711_set_dout(int dout){
-    HX711_DOUT = dout;
-}
-
-void hx711_init(uint8_t gain, int sck, int dout){
-    hx711_set_sck(sck);
-    hx711_set_dout(dout);
-
-    gpio_init(HX711_SCK, GPIO_OUT);
-    gpio_init(HX711_DOUT, GPIO_IN);
-
-    hx711_set_gain(gain);
-}
-
-uint32_t hx711_read_average(uint32_t times){
-    uint32_t sum = 0;
-    for (uint8_t i = 0; i < times; i++) {
+/**
+ * @brief Read a raw value a configurable times and return the average raw value for it
+ * @param times
+ * @return the average value. Always rounded up.
+ */
+int32_t hx711_read_average(uint32_t times)
+{
+    int32_t sum = 0;
+    for (int8_t i = 0; i < times; i++) {
         sum += hx711_read();
-        yield();
     }
-    return sum / times;
+    return (int32_t) ((sum / times) + 0.5);
 }
 
-
-double hx711_get_value(uint8_t times) {
-    return hx711_read_average(times) - HX711_OFFSET;
+/**
+ * @brief Read a value a configurable times and return the average value. Always rounded up.
+ * @param times
+ * @return returns AVG(RAW_VALUE) - HX711_PARAM_OFFSET
+ */
+int32_t hx711_get_value(int8_t times)
+{
+    return (int32_t) ((hx711_read_average(times) - HX711_PARAM_OFFSET) + 0.5);
 }
 
-float hx711_get_units(uint8_t times) {
-    return hx711_get_value(times) / HX711_SCALE;
+/**
+ * @brief Read the average of a configurable times of a cleared and scaled value. Always rounded up.
+ * @param times
+ * @return returns (AVG(RAW_VALUE) - HX711_PARAM_OFFSET) / HX711_PARAM_SCALE
+ */
+int32_t hx711_get_units(int8_t times)
+{
+    return (int32_t) ((hx711_get_value(times) / HX711_PARAM_SCALE) + 0.5);
 }
 
-void hx711_set_offset(long offset) {
-    HX711_OFFSET = offset;
+void hx711_power_down(void)
+{
+    gpio_clear(HX711_PARAM_SCK);
+    gpio_set(HX711_PARAM_SCK);
 }
 
-void hx711_tare(uint8_t times) {
-    double sum = hx711_read_average(times);
-    hx711_set_offset(sum);
-}
-
-void hx711_set_scale(float scale) {
-    HX711_SCALE = scale;
-}
-
-float hx711_get_scale(void) {
-    return HX711_SCALE;
-}
-
-long hx711_get_offset(void) {
-    return HX711_OFFSET;
-}
-
-void hx711_power_down(void) {
-    gpio_clear(HX711_SCK);
-    gpio_set(HX711_SCK);
-}
-
-void hx711_power_up(void) {
-    gpio_clear(HX711_SCK);
+void hx711_power_up(void)
+{
+    gpio_clear(HX711_PARAM_SCK);
 }
