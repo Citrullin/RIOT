@@ -202,7 +202,13 @@ endif
 ifneq (,$(filter il3829,$(USEMODULE)))
   FEATURES_REQUIRED += periph_spi
   FEATURES_REQUIRED += periph_gpio
-  USEMODULE += spi_display
+  USEMODULE += spi_epd_display
+endif
+
+ifneq (,$(filter il0373,$(USEMODULE)))
+  FEATURES_REQUIRED += periph_spi
+  FEATURES_REQUIRED += periph_gpio
+  USEMODULE += spi_epd_display
 endif
 
 ifneq (,$(filter ina220,$(USEMODULE)))
@@ -454,7 +460,7 @@ ifneq (,$(filter soft_spi,$(USEMODULE)))
   USEMODULE += xtimer
 endif
 
-ifneq (,$(filter spi_display,$(USEMODULE)))
+ifneq (,$(filter spi_epd,$(USEMODULE)))
   FEATURES_REQUIRED += periph_spi
   FEATURES_REQUIRED += periph_gpio
 endif
