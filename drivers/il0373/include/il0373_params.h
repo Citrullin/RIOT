@@ -32,7 +32,7 @@ extern "C" {
  * @{
  */
 #ifndef IL0373_PARAM_SPI
-#define IL0373_PARAM_SPI          (SPI_DEV(0))
+#define IL0373_PARAM_SPI          (SPI_DEV(1))
 #endif
 #ifndef IL0373_PARAM_SPI_CLK
 #define IL0373_PARAM_SPI_CLK      (SPI_CLK_5MHZ)
@@ -64,7 +64,7 @@ extern "C" {
 /**
  * @brief   Configure IL0373
  */
-static const spi_display_params_t IL0373_params[] =
+static const spi_epd_params_t il0373_params[] =
 {
     IL0373_PARAMS,
 };

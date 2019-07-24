@@ -66,7 +66,7 @@
 
 #include "periph/spi.h"
 #include "periph/gpio.h"
-#include "spi_display.h"
+#include "spi_epd.h"
 
 #ifdef __cplusplus
 extern "C" {

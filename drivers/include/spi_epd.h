@@ -17,8 +17,8 @@
  *
  * @author      Silke Hofstra <silke@slxh.eu>
  */
-#ifndef SPI_DISPLAY_H
-#define SPI_DISPLAY_H
+#ifndef SPI_EPD_H
+#define SPI_EPD_H
 
 #include "periph/spi.h"
 #include "periph/gpio.h"
@@ -70,7 +70,7 @@ void spi_epd_cmd_start(spi_epd_params_t *p, uint8_t cmd, bool cont);
 /**
  * @brief   Send a SPI epaper display command with data.
  *
- * @param[in] p         SPI display parameters.
+ * @param[in] p         SPI epd parameters.
  * @param[in] cmd       Command to execute.
  * @param[in] params    Command parameters to send.
  * @param[in] plen      Size of the command parameters.
@@ -80,7 +80,7 @@ void spi_epd_write_cmd(spi_epd_params_t *p, uint8_t cmd, const uint8_t* params, 
 /**
  * @brief   Send a SPI epaper display command and store the returned data.
  *
- * @param[in] p         SPI display parameters.
+ * @param[in] p         SPI epd parameters.
  * @param[in] cmd       Command to execute.
  * @param[in] params    Command response to read.
  * @param[in] plen      Size of the command response.
@@ -90,7 +90,7 @@ void spi_epd_read_cmd(spi_epd_params_t *p, uint8_t cmd, uint8_t* params, size_t 
 /**
  * @brief   Wait for the busy pin or a predetermined amount of time.
  *
- * @param[in] p         SPI display parameters.
+ * @param[in] p         SPI epd parameters.
  * @param[in] usec      Number of µs to wait if the busy pin is undefined.
  */
 void spi_epd_wait(spi_epd_params_t *p, uint32_t usec);

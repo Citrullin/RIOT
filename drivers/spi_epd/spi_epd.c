@@ -35,7 +35,7 @@ void spi_epd_cmd_start(spi_epd_params_t *p, uint8_t cmd, bool cont)
 void spi_epd_write_cmd(spi_epd_params_t *p, uint8_t cmd, const uint8_t *params, size_t plen)
 {
     spi_acquire(p->spi, p->cs_pin, SPI_MODE_0, p->spi_clk);
-    spi_epd_cmd_start(p, cmd, plen != NULL || false);
+    spi_epd_cmd_start(p, cmd, plen ? true : false);
     if (plen) {
         spi_transfer_bytes(p->spi, p->cs_pin, false, params, NULL, plen);
     }

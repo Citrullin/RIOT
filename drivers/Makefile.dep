@@ -202,13 +202,13 @@ endif
 ifneq (,$(filter il3829,$(USEMODULE)))
   FEATURES_REQUIRED += periph_spi
   FEATURES_REQUIRED += periph_gpio
-  USEMODULE += spi_epd_display
+  USEMODULE += spi_epd
 endif
 
 ifneq (,$(filter il0373,$(USEMODULE)))
   FEATURES_REQUIRED += periph_spi
   FEATURES_REQUIRED += periph_gpio
-  USEMODULE += spi_epd_display
+  USEMODULE += spi_epd
 endif
 
 ifneq (,$(filter ina220,$(USEMODULE)))
