@@ -28,6 +28,8 @@ int main(void)
 
     il0373_init_full(&dev);
 
+    il0373_clear(&dev);
+
     /*
     xtimer_ticks32_t last_wakeup = xtimer_now();
     while (1) {

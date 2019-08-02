@@ -27,17 +27,23 @@
 extern "C" {
 #endif
 
+typedef enum {
+    SPI_EPD_ACTIVE_LOW = 0,
+    SPI_EPD_ACTIVE_HIGH = 1
+} spi_epd_active_t;
+
 /**
  * @brief   SPI epaper display device initialisation parameters.
  */
 typedef struct {
-    spi_t spi;          /**< SPI device that the display is connected to */
-    spi_clk_t spi_clk;  /**< SPI clock speed to use */
-    gpio_t cs_pin;      /**< pin connected to the CHIP SELECT line */
-    gpio_t dc_pin;      /**< pin connected to the DC line */
-    gpio_t rst_pin;     /**< pin connected to the reset line */
-    gpio_t busy_pin;    /**< pin connected to the busy line */
-    bool dummy;         /**< if device requires a dummy cycle before read */
+    spi_t spi;                          /**< SPI device that the display is connected to */
+    spi_clk_t spi_clk;                  /**< SPI clock speed to use */
+    gpio_t cs_pin;                      /**< pin connected to the CHIP SELECT line */
+    gpio_t dc_pin;                      /**< pin connected to the DC line */
+    gpio_t rst_pin;                     /**< pin connected to the reset line */
+    gpio_t busy_pin;                    /**< pin connected to the busy line */
+    spi_epd_active_t busy_pin_active;   /**<busy pin active low or active high */
+    bool dummy;                         /**< if device requires a dummy cycle before read */
 } spi_epd_params_t;
 
 /**

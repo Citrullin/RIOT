@@ -23,7 +23,7 @@
 #include "il0373_params.h"
 #include "il0373_internal.h"
 
-#define ENABLE_DEBUG (0)
+#define ENABLE_DEBUG (1)
 #include "debug.h"
 
 int il0373_init(il0373_t *dev, const spi_epd_params_t *params,
@@ -41,21 +41,24 @@ void il0373_display_init(il0373_t *dev)
 {
     il0373_wake(dev);
 
+    DEBUG("[il0373] display init: booster soft start\n");
     uint8_t data[3];
     data[0] = 0x17;
     data[1] = 0x17;
     data[2] = 0x17;
     spi_epd_write_cmd(&dev->params, IL0373_CMD_BOOSTER_SOFT_START_CONTROL, data, 3);
 
-    spi_epd_cmd_start(&dev->params, IL0373_CMD_POWER_ON, false);
+    DEBUG("[il0373] display init: power on controller\n");
+    spi_epd_write_cmd(&dev->params, IL0373_CMD_POWER_ON, NULL, 0);
 
     //Todo: Make configurable
+    DEBUG("[il0373] display init: set panel settings\n");
     data[0] = 0x0f;
     spi_epd_write_cmd(&dev->params, IL0373_CMD_PANEL_SETTING, data, 1);
 
     uint32_t res_data[1] = { 0 };
-
     res_data[0] = ((dev->size_x << 19) ^ dev->size_y) & 0xFE01FF;
+    DEBUG("[il0373] display init: set resolution setting to %i x %i\n", dev->size_x, dev->size_y);
     spi_epd_write_cmd(&dev->params, IL0373_CMD_RESOLUTION, (uint8_t *)res_data, 3);
 
     data[0] = 0x77;
@@ -117,7 +120,7 @@ void il0373_fill_pixels(il0373_t *dev, uint8_t *px_black, uint8_t *px_colored, u
     spi_epd_write_cmd(&dev->params, IL0373_CMD_DTM1, px_black, length);
     spi_epd_write_cmd(&dev->params, IL0373_CMD_DTM2, px_colored, length);
 
-    spi_epd_cmd_start(&dev->params, IL0373_CMD_DATA_STOP, false);
+    spi_epd_write_cmd(&dev->params, IL0373_CMD_DATA_STOP, NULL, 0);
 }
 
 void il0373_set_area(il0373_t *dev, uint8_t x1, uint8_t x2, uint16_t y1, uint16_t y2)
@@ -150,8 +153,9 @@ void il0373_wake(il0373_t *dev)
     /* Give a low pulse on the reset pin */
     if (dev->params.rst_pin != GPIO_UNDEF) {
         gpio_clear(dev->params.rst_pin);
-        spi_epd_wait(&dev->params, IL0373_WAIT_RESET);
+        xtimer_usleep(IL0373_WAIT_RESET);
         gpio_set(dev->params.rst_pin);
+        spi_epd_wait(&dev->params, IL0373_WAIT_RESET);
     }
 }
 

@@ -57,6 +57,7 @@ extern "C" {
                                      .dc_pin = IL0373_PARAM_DC, \
                                      .rst_pin = IL0373_PARAM_RST, \
                                      .busy_pin = IL0373_PARAM_BUSY, \
+                                     .busy_pin_active = SPI_EPD_ACTIVE_LOW, \
                                    }
 #endif
 /**@}*/

@@ -19,22 +19,25 @@
 #include "xtimer.h"
 #include "spi_epd.h"
 
-#define ENABLE_DEBUG (0)
+#define ENABLE_DEBUG (1)
 #include "debug.h"
 
 void spi_epd_cmd_start(spi_epd_params_t *p, uint8_t cmd, bool cont)
 {
     if (p->busy_pin != GPIO_UNDEF) {
-        while (gpio_read(p->busy_pin)) {}
+        DEBUG("[spi_epd] device is busy\n");
+        while (gpio_read(p->busy_pin) == p->busy_pin_active) {}
     }
     gpio_clear(p->dc_pin);
+    DEBUG("[spi_epd] device not busy. Transfer command byte [0x%x].\n", cmd & 0xff);
     spi_transfer_byte(p->spi, p->cs_pin, cont, (uint8_t)cmd);
     gpio_set(p->dc_pin);
 }
 
 void spi_epd_write_cmd(spi_epd_params_t *p, uint8_t cmd, const uint8_t *params, size_t plen)
 {
-    spi_acquire(p->spi, p->cs_pin, SPI_MODE_0, p->spi_clk);
+    DEBUG("[spi_epd] write cmd\n");
+    spi_acquire(p->spi, p->cs_pin, SPI_MODE_3, p->spi_clk);
     spi_epd_cmd_start(p, cmd, plen ? true : false);
     if (plen) {
         spi_transfer_bytes(p->spi, p->cs_pin, false, params, NULL, plen);
@@ -88,7 +91,9 @@ int spi_epd_init(spi_epd_params_t *p)
 void spi_epd_wait(spi_epd_params_t *p, uint32_t usec)
 {
     if (p->busy_pin != GPIO_UNDEF) {
-        while (gpio_read(p->busy_pin)) {}
+        DEBUG("[spi_epd] wait for busy == %i\n", p->busy_pin_active);
+        while (gpio_read(p->busy_pin) == p->busy_pin_active) {}
+        DEBUG("[spi_epd] controller is ready\n");
     }
     else {
         xtimer_usleep(usec);
