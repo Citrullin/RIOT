@@ -1,0 +1,8 @@
+syntax = "proto2";
+package iotaDoorLock;
+
+message DIDRequest {
+    required string schema = 1;
+    required string method = 2;
+    required string id = 3;
+}

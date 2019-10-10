@@ -1,313 +1,453 @@
 /**
- * This implementation should be C99 & POSIX compatible. Independent of the OS.
- * If not => create github issue
- * So, you should be able to use it in other POSIX compatible OS as well.
+ * This implementation must be C99 & POSIX compatible!
  */
 
+//Std header
 #include <unistd.h>
 #include <stdio.h>
-#include <sys/socket.h>
 #include <stdlib.h>
-#include <netinet/in.h>
 #include <string.h>
 
+#include "config.h"
+#include "logging.h"
+
+//POSIX
 #include "pthread.h"
 
-#include "proto_compiled/DataRequest.pb.h"
-#include "proto_compiled/DataResponse.pb.h"
-#include "proto_compiled/FeatureResponse.pb.h"
+//BLE communication
+#include "nimble_riot.h"
+#include "net/bluetil/ad.h"
 
-/**
- * Log structure:
- * LEVEL | FUNCTION_NAME | TYPE | KEY: VALUE
- *
- * LEVEL => ERROR, INFO, DEBUG
- * FUNCTION_NAME => the string name of the calling function
- * TYPE => string, bool etc.
- * KEY => variable name or struct
- */
+#include "host/ble_hs.h"
+#include "host/util/util.h"
+#include "host/ble_gatt.h"
+#include "services/gap/ble_svc_gap.h"
+#include "services/gatt/ble_svc_gatt.h"
 
-//Todo: Use macros to generate debug code.
-#define DEBUG_SERVER true
+//Encoding / Decoding
+#include "proto_compiled/AccessStatus.pb.h"
+#include "proto_compiled/DIDRequest.pb.h"
+#include "proto_compiled/DIDResponse.pb.h"
 
-uint32_t status_received_ddid_messages_successful = 0;
+#include "crypto/ciphers.h"
+
+char server_did_buffer[DID_BUFFER_SIZE];
+char error_message_buffer[ERROR_BUFFER_SIZE];
+
+cipher_t cipher;
+uint8_t did_key[AES_KEY_SIZE] = {0},
+    did_cipher_text[AES_BLOCK_SIZE] = {0};
+
+static const ble_uuid128_t gatt_svr_svc_rw_door_lock_uuid
+    = BLE_UUID128_INIT( GATT_SERVICE_UUID );
+
+static const ble_uuid128_t gatt_svr_svc_chr_w_did_uuid
+    = BLE_UUID128_INIT( GATT_DID_CHARACTERISTIC_UUID );
+
+static const ble_uuid128_t gatt_svr_svc_chr_r_access_status_uuid
+    = BLE_UUID128_INIT( GATT_ACCESS_STATUS_CHARACTERISTIC_UUID );
+
+static const ble_uuid128_t gatt_svr_chr_r_error_message_uuid
+    = BLE_UUID128_INIT( GATT_ERROR_MESSAGE_CHARACTERISTIC_UUID );
+
+static const char *device_name = DEVICE_NAME;
+
+static int gatt_svr_chr_access_device_info_manufacturer(
+    uint16_t conn_handle, uint16_t attr_handle,
+    struct ble_gatt_access_ctxt *ctxt, void *arg);
+
+static int gatt_svr_chr_access_device_info_model(
+    uint16_t conn_handle, uint16_t attr_handle,
+    struct ble_gatt_access_ctxt *ctxt, void *arg);
+
+static int gatt_svr_chr_access_rw_door_lock(
+    uint16_t conn_handle, uint16_t attr_handle,
+    struct ble_gatt_access_ctxt *ctxt, void *arg);
+
+static void start_advertise(void);
+
+/* define several bluetooth services for our device */
+static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
+    /*
+     * access_cb defines a callback for read and write access events on
+     * given characteristics
+     */
+    {
+        /* Service: Device Information */
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = BLE_UUID16_DECLARE(GATT_DEVICE_INFO_UUID),
+        .characteristics = (struct ble_gatt_chr_def[])
+            {
+                {
+                    /* Characteristic: * Manufacturer name */
+                    .uuid = BLE_UUID16_DECLARE(GATT_MANUFACTURER_NAME_UUID),
+                    .access_cb = gatt_svr_chr_access_device_info_manufacturer,
+                    .flags = BLE_GATT_CHR_F_READ,
+                },
+                {
+                    /* Characteristic: Model number string */
+                    .uuid = BLE_UUID16_DECLARE(GATT_MODEL_NUMBER_UUID),
+                    .access_cb = gatt_svr_chr_access_device_info_model,
+                    .flags = BLE_GATT_CHR_F_READ,
+                },
+                {
+                    0, /* No more characteristics in this service */
+                },
+            }
+    },
+    {
+        /* Service: Read/Write Door lock access */
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = (ble_uuid_t * ) & gatt_svr_svc_rw_door_lock_uuid.u,
+        .characteristics = (struct ble_gatt_chr_def[])
+            {
+                {
+                    /* Characteristic: Read/Write DID */
+                    .uuid = (ble_uuid_t * ) &
+                            gatt_svr_svc_chr_w_did_uuid.u,
+                    .access_cb = gatt_svr_chr_access_rw_door_lock,
+                    .flags = BLE_GATT_CHR_F_READ |
+                             BLE_GATT_CHR_F_WRITE,
+                },
+                {
+                    /* Characteristic: Read access status */
+                    .uuid = (ble_uuid_t * ) &
+                            gatt_svr_svc_chr_r_access_status_uuid.u,
+                    .access_cb = gatt_svr_chr_access_rw_door_lock,
+                    .flags = BLE_GATT_CHR_F_READ,
+                },
+                {
+                    /* Characteristic: Read Error Message */
+                    .uuid = (ble_uuid_t * ) &
+                            gatt_svr_chr_r_error_message_uuid.u,
+                    .access_cb = gatt_svr_chr_access_rw_door_lock,
+                    .flags = BLE_GATT_CHR_F_READ,
+                },
+                {
+                    0, /* No more characteristics in this service */
+                },
+            }
+    },
+    {
+        0, /* No more services */
+    },
+};
+
+uint32_t status_access_status_read_request_count = 0;
+uint32_t status_did_write_request_count = 0;
+uint32_t status_did_read_request_count = 0;
+uint32_t status_error_read_request_count = 0;
+
 uint32_t status_error_count = 0;
-uint32_t status_opened_door = 0;
+uint32_t status_access_granted_count = 0;
+uint32_t status_access_denied_count = 0;
 
-uint8_t encode_buffer[500];
+uint8_t encode_buffer[ENCODE_BUFFER_SIZE];
 size_t encode_buffer_length;
 
 void clear_encode_buffer(void) {
-    memset(encode_buffer, 0, sizeof(encode_buffer));
+    memset(encode_buffer, 0, ENCODE_BUFFER_SIZE);
     encode_buffer_length = 0;
 }
 
-#define RESPONSE_BUFFER_SIZE 500
-uint8_t response_buffer[RESPONSE_BUFFER_SIZE];
+static char response_buffer[RESPONSE_BUFFER_SIZE];
 size_t response_buffer_length;
 
 void clear_response_buffer(void) {
     memset(response_buffer, 0, RESPONSE_BUFFER_SIZE);
-    socket_buffer_length = 0;
+    response_buffer_length = 0;
 }
-
-//Logging
-extern void log_int(char *level, char *func_name, char *key, int value);
-
-extern void log_string(char *level, char *func_name, char *key, char *value);
-
-extern void log_hex(char *level, char *func_name, char *key, uint8_t value);
-
-extern void log_addr(char *level, char *func_name, char *key, struct sockaddr_in6 *client_addr);
-
-extern void log_hex_array(char *level, char *func_name, char *key, uint8_t *value, size_t length);
 
 //Encode
-extern int env_sensor_data_response_encode(
-        uint8_t *buffer, size_t buffer_size, environmentSensors_DataResponse *message_ptr);
-
-extern int env_sensor_feature_response_encode(uint8_t *buffer, size_t buffer_size,
-                                              environmentSensors_FeatureResponse *message_ptr);
-
-
-
+extern int did_response_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_DIDResponse *message_ptr);
+extern int access_status_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_AccessStatus *message_ptr);
 
 //Decode
-extern int env_sensor_data_request_decode(
-        environmentSensors_DataRequest *message_ptr,
-        uint8_t *encoded_msg_ptr, size_t decoded_msg_size);
+extern bool decode_did_schema_cb(pb_istream_t *stream, const pb_field_t *field, void **arg);
+extern bool decode_did_method_cb(pb_istream_t *stream, const pb_field_t *field, void **arg);
+extern bool decode_did_id_cb(pb_istream_t *stream, const pb_field_t *field, void **arg);
+extern int did_request_decode(iotaDoorLock_DIDRequest *message_ptr,
+                              uint8_t *encoded_msg_ptr, size_t decoded_msg_size);
 
-extern int env_sensor_feature_request_decode(
-        environmentSensors_FeatureResponse *message_ptr,
-        uint8_t *encoded_msg_ptr, size_t decoded_msg_size);
+iotaDoorLock_DIDRequest did_request;
 
 
-typedef enum {
-    FEATURE_REQUEST_CMD,
-    FEATURE_RESPONSE_CMD,
-    DATA_REQUEST_CMD,
-    DATA_RESPONSE_CMD,
-    ERROR_RESPONSE_CMD,
-    SETUP_TEST_CMD,
-    NONE_MESSAGE
-} env_sensor_rpc_command_t;
+bool initialized_server = false;
+bool server_is_running = false;
 
-env_sensor_rpc_command_t get_env_sensor_rpc_command(uint8_t type) {
-    switch (type) {
-        case 33:
-            return FEATURE_REQUEST_CMD;
-        case 34:
-            return DATA_REQUEST_CMD;
-        case 35:
-            return DATA_RESPONSE_CMD;
-        case 36:
-            return FEATURE_RESPONSE_CMD;
-        case 88:
-            return SETUP_TEST_CMD;
-        default:
-            return NONE_MESSAGE;
-    }
-}
+static int gap_event_cb(struct ble_gap_event *event, void *arg) {
+    (void) arg;
+    char func_name[] = "gap_event_cb";
 
-uint8_t get_env_sensor_rpc_command_byte(env_sensor_rpc_command_t command) {
-    switch (command) {
-        case FEATURE_REQUEST_CMD:
-            return 33;
-        case DATA_REQUEST_CMD:
-            return 34;
-        case DATA_RESPONSE_CMD:
-            return 35;
-        case FEATURE_RESPONSE_CMD:
-            return 36;
-        default:
-            return 0;
-    }
-}
+    switch (event->type) {
+        case BLE_GAP_EVENT_CONNECT:
+            log_message(DEBUG, func_name, "Bluetooth server", "New device connected to server.");
 
-int get_env_sensor_rpc_command_name(char *result, env_sensor_rpc_command_t command) {
-    switch (command) {
-        case FEATURE_REQUEST_CMD:
-            strcat(result, "FEATURE_REQUEST_CMD");
+            if (event->connect.status) {
+                start_advertise();
+            }
             break;
-        case DATA_REQUEST_CMD:
-            strcat(result, "DATA_REQUEST_CMD");
+
+        case BLE_GAP_EVENT_DISCONNECT:
+            log_message(DEBUG, func_name, "Bluetooth server", "Device disconnected from server.");
+            start_advertise();
             break;
-        case DATA_RESPONSE_CMD:
-            strcat(result, "DATA_RESPONSE_CMD");
-            break;
-        case FEATURE_RESPONSE_CMD:
-            strcat(result, "DATA_RESPONSE_CMD");
-            break;
-        default:
-            strcat(result, "NONE_CMD");
     }
 
     return 0;
 }
 
-void send_buffer(int sock, struct sockaddr_in6 *client_addr_ptr) {
-    if (DEBUG_SERVER) {
-        log_addr("DEBUG", "send_buffer", "client_addr", client_addr_ptr);
-    }
+static int gatt_svr_chr_access_device_info_manufacturer(
+    uint16_t conn_handle, uint16_t attr_handle,
+    struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    char func_name[] = "gatt_svr_chr_access_device_info_manufacturer";
+    log_message(DEBUG, func_name, "Bluetooth server", "callback of service 'device info: manufacturer' triggered.");
 
-    status_send_packets += 1;
-    sendto(
-            sock, encode_buffer, encode_buffer_length, 0,
-            (struct sockaddr *) client_addr_ptr, sizeof(struct sockaddr_in6));
+    (void) conn_handle;
+    (void) attr_handle;
+    (void) arg;
+
+    snprintf(response_buffer, RESPONSE_BUFFER_SIZE, DEVICE_INFO_MANUFACTURER, RIOT_VERSION);
+
+    log_string(DEBUG, func_name, "response_buffer", response_buffer);
+
+    return os_mbuf_append(ctxt->om, response_buffer, strlen(response_buffer));;
 }
 
-void handle_env_sensor_feature_request(int sock, struct sockaddr_in6 *client_addr_ptr) {
-    clear_encode_buffer();
+static int gatt_svr_chr_access_device_info_model(
+    uint16_t conn_handle, uint16_t attr_handle,
+    struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    char func_name[] = "gatt_svr_chr_access_device_info_model";
+    log_message(DEBUG, func_name, "Bluetooth server", "callback of service 'device info: model' triggered.");
 
-    encode_buffer[0] = get_env_sensor_rpc_command_byte(FEATURE_RESPONSE_CMD);
-    encode_buffer_length = 1;
+    (void) conn_handle;
+    (void) attr_handle;
+    (void) arg;
 
-    encode_buffer_length +=
-            env_sensor_feature_response_encode(
-                    &encode_buffer[1], sizeof(encode_buffer) - 1, &sensor_node_features);
+    snprintf(response_buffer, RESPONSE_BUFFER_SIZE, DEVICE_INFO_MODEL, RIOT_MCU);
 
-    send_buffer(sock, client_addr_ptr);
+    log_string(DEBUG, func_name, "response_buffer", response_buffer);
+
+    return os_mbuf_append(ctxt->om, response_buffer, strlen(response_buffer));
+}
+
+int handle_did_write_request(struct ble_gatt_access_ctxt *ctxt){
+    char func_name[] = "handle_did_write_request";
+    log_string(DEBUG, func_name, "server_did_buffer", server_did_buffer);
+    status_did_write_request_count =+ 1;
+
+    int rc = 0;
+    uint16_t om_len;
+    om_len = OS_MBUF_PKTLEN(ctxt->om);
+
+    /* read sent data */
+    rc = ble_hs_mbuf_to_flat(ctxt->om, &server_did_buffer,
+                             sizeof(server_did_buffer), &om_len);
+    /* we need to null-terminate the received string */
+    server_did_buffer[om_len] = '\0';
+
+    log_string(DEBUG, func_name, "server_did_buffer", server_did_buffer);
+
+    did_request_decode(&did_request, (uint8_t *) server_did_buffer, om_len);
+
+    return rc;
+}
+
+int handle_did_read_request(struct ble_gatt_access_ctxt *ctxt){
+    log_string(DEBUG, "handle_did_read_request", "server_did_buffer", server_did_buffer);
+
+    int rc = 0;
+    /* send given data to the client */
+    rc = os_mbuf_append(ctxt->om, &server_did_buffer,
+                        strlen(server_did_buffer));
+
+    return rc;
+}
+
+int handle_error_message_read_request(struct ble_gatt_access_ctxt *ctxt){
+    strncpy(response_buffer, error_message_buffer, RESPONSE_BUFFER_SIZE);
+    log_string(DEBUG, "handle_error_message_read_request", "response_buffer", response_buffer);
+
+    return os_mbuf_append(ctxt->om, &response_buffer, strlen(response_buffer));
+}
+
+int handle_access_status_read_request(struct ble_gatt_access_ctxt *ctxt){
+    snprintf(response_buffer, RESPONSE_BUFFER_SIZE, "access not granted.");
+    log_string(DEBUG, "handle_access_status_read_request", "response_buffer", response_buffer);
+
+    return os_mbuf_append(ctxt->om, &response_buffer, strlen(response_buffer));
+}
+
+static int gatt_svr_chr_access_rw_door_lock(
+    uint16_t conn_handle, uint16_t attr_handle,
+    struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    char func_name[] = "gatt_svr_chr_access_rw_door_lock";
+
+    log_message(DEBUG, func_name, "Bluetooth server", "callback of service 'rw_door_lock' triggered.");
+
+    (void) conn_handle;
+    (void) attr_handle;
+    (void) arg;
+
+    int rc = 0;
+
+    ble_uuid_t* write_did_uuid = (ble_uuid_t*) &gatt_svr_svc_chr_w_did_uuid.u;
+    ble_uuid_t* readonly_access_status_uuid = (ble_uuid_t*) &gatt_svr_svc_chr_r_access_status_uuid.u;
+    ble_uuid_t* readonly_error_message_uuid = (ble_uuid_t*) &gatt_svr_chr_r_error_message_uuid.u;
+
+    if (ble_uuid_cmp(ctxt->chr->uuid, write_did_uuid) == 0) {
+        log_message(DEBUG, func_name, "Bluetooth server", "access to 'w_did' (write) characteristics.");
+
+        switch (ctxt->op) {
+
+            case BLE_GATT_ACCESS_OP_READ_CHR:
+                rc = handle_did_read_request(ctxt);
+                break;
+
+            case BLE_GATT_ACCESS_OP_WRITE_CHR:
+                rc = handle_did_write_request(ctxt);
+                break;
+
+            case BLE_GATT_ACCESS_OP_READ_DSC:
+                log_message(DEBUG, func_name, "Bluetooth server", "read from 'w_did' (write) descriptor.");
+                break;
+
+            case BLE_GATT_ACCESS_OP_WRITE_DSC:
+                break;
+
+            default:
+                log_message(DEBUG, func_name, "Bluetooth server", "Unhandled operation in 'w_did' (write).");
+                rc = 1;
+                break;
+        }
+
+        return rc;
+    }
+    else if (ble_uuid_cmp(ctxt->chr->uuid, readonly_error_message_uuid) == 0) {
+        log_message(DEBUG, func_name, "Bluetooth server", "access to 'r_error_message' (read-only) characteristics.");
+
+        if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+            return handle_error_message_read_request(ctxt);
+        }
+
+        return 0;
+    }
+    else if (ble_uuid_cmp(ctxt->chr->uuid, readonly_access_status_uuid) == 0) {
+        log_message(DEBUG, func_name, "Bluetooth server", "access to 'r_access_status' (read-only) characteristics.");
+
+        if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+            return handle_access_status_read_request(ctxt);
+        }
+
+        return 0;
+    }
+
+    log_message(ERROR, func_name, "Bluetooth server", "Unhandled UUID!");
+    return 1;
 }
 
 
-extern void sensors_read_values(void);
-extern environmentSensors_SingleDataPoint * sensors_get_temp_value(void);
-//extern environmentSensors_SingleDataPoint * sensors_get_hum_value(void);
+static void start_advertise(void) {
+    char func_name[] = "start_advertise";
+    log_message(DEBUG, func_name, "Bluetooth server", "Start Bluetooth advertising...");
 
-environmentSensors_DataResponse dataResponse;
-void handle_env_sensor_data_request(int sock, struct sockaddr_in6 *client_addr_ptr) {
-    clear_encode_buffer();
-    sensors_read_values();
+    struct ble_gap_adv_params advp;
+    int rc;
 
-    encode_buffer[0] = get_env_sensor_rpc_command_byte(DATA_RESPONSE_CMD);
-    encode_buffer_length = 1;
-
-    environmentSensors_SingleDataPoint * temp_data_point = sensors_get_temp_value();
-    //environmentSensors_SingleDataPoint * hum_data_point = sensors_get_hum_value();
-
-
-    dataResponse.has_temperature = true;
-    dataResponse.temperature = *temp_data_point;
-
-    //dataResponse.has_humanity = true;
-    //dataResponse.humanity = *hum_data_point;
-
-    encode_buffer_length +=
-            env_sensor_data_response_encode(
-                    &encode_buffer[1], sizeof(encode_buffer) - 1, &dataResponse);
-
-    send_buffer(sock, client_addr_ptr);
+    memset(&advp, 0, sizeof advp);
+    advp.conn_mode = BLE_GAP_CONN_MODE_UND;
+    advp.disc_mode = BLE_GAP_DISC_MODE_GEN;
+    rc = ble_gap_adv_start(nimble_riot_own_addr_type, NULL, BLE_HS_FOREVER,
+                           &advp, gap_event_cb, NULL);
+    assert(rc == 0);
+    log_message(DEBUG, func_name, "Bluetooth server", "Bluetooth advertising started.");
+    (void) rc;
 }
 
-void add_incoming_message_to_status(env_sensor_rpc_command_t *command) {
-    switch (*command) {
-        case FEATURE_REQUEST_CMD:
-            status_received_packets_successful += 1;
-            break;
-        default:
-            status_received_packets_error += 1;
-            break;
+pb_callback_t pb_did_method_cb;
+pb_callback_t pb_did_schema_cb;
+pb_callback_t pb_did_id_cb;
+
+void server_init(void) {
+    char func_name[] = "server_init";
+    log_message(DEBUG, func_name, "Bluetooth server", "Initialize server...");
+    if(!initialized_server){
+        int rc = 0;
+
+        pb_did_id_cb.funcs.decode = &decode_did_id_cb;
+        pb_did_method_cb.funcs.decode = &decode_did_method_cb;
+        pb_did_schema_cb.funcs.decode = &decode_did_schema_cb;
+
+        log_message(DEBUG, func_name, "Bluetooth server", "Verify and add our custom services...");
+        rc = ble_gatts_count_cfg(gatt_svr_svcs);
+        assert(rc == 0);
+        rc = ble_gatts_add_svcs(gatt_svr_svcs);
+        assert(rc == 0);
+        log_message(DEBUG, func_name, "Bluetooth server", "Verification done.");
+
+
+        log_message(DEBUG, func_name, "Bluetooth server", "Set the device name...");
+        ble_svc_gap_device_name_set(device_name);
+        log_message(DEBUG, func_name, "Bluetooth server", "Set the device name done.");
+
+
+        log_message(DEBUG, func_name, "Bluetooth server", "Reload the GATT server to link our added services...");
+        ble_gatts_start();
+        log_message(DEBUG, func_name, "Bluetooth server", "Reloaded GATT server.");
+
+
+        log_message(DEBUG, func_name, "Bluetooth server", "Configure and set the advertising data...");
+        uint8_t buf[BLE_HS_ADV_MAX_SZ];
+        bluetil_ad_t ad;
+        bluetil_ad_init_with_flags(&ad, buf, sizeof(buf), BLUETIL_AD_FLAGS_DEFAULT);
+        bluetil_ad_add_name(&ad, device_name);
+        ble_gap_adv_set_data(ad.buf, ad.pos);
+        log_message(DEBUG, func_name, "Bluetooth server", "Server configured.");
+
+        initialized_server = true;
+        log_message(DEBUG, func_name, "Bluetooth server", "Server initialized.");
+    }else{
+        log_message(DEBUG, func_name, "Bluetooth server", "Server already initialized.");
     }
 }
-
-void handle_incoming_message(int sock, struct sockaddr_in6 *client_addr_ptr) {
-    char func_name[] = "handle_incoming_message";
-
-    env_sensor_rpc_command_t message_command = get_env_sensor_rpc_command(socket_buffer[0]);
-
-    if (DEBUG_SERVER) {
-        log_hex("DEBUG", func_name, "hex_command", (uint8_t) socket_buffer[0]);
-        char command_name[30] = "";
-        get_env_sensor_rpc_command_name(command_name, message_command);
-        log_string("DEBUG", func_name, "command_name", command_name);
-        log_int("DEBUG", func_name, "client_port", ntohs(client_addr_ptr->sin6_port));
-        log_addr("DEBUG", func_name, "client_addr", client_addr_ptr);
-    }
-    add_incoming_message_to_status(&message_command);
-
-    switch (message_command) {
-        case FEATURE_REQUEST_CMD:
-            handle_env_sensor_feature_request(sock, client_addr_ptr);
-            break;
-        case DATA_REQUEST_CMD:
-            handle_env_sensor_data_request(sock, client_addr_ptr);
-            break;
-        default:
-            log_hex("ERROR", func_name, "hex_command", (uint8_t) socket_buffer[0]);
-            log_addr("ERROR", func_name, "client_addr", client_addr_ptr);
-            break;
-    }
-}
-
-bool initialized_server;
-bool server_is_running;
-int server_socket;
-
-extern void sensors_init(void);
-
-void server_init(struct sockaddr_in6 *server_addr, size_t server_addr_size) {
-    sensors_init();
-
-    memset(server_addr, 0, server_addr_size);
-    server_addr->sin6_family = AF_INET6;
-    server_addr->sin6_port = htons(PORT);
-    server_addr->sin6_scope_id = 0;
-
-    if (DEBUG_SERVER) {
-        log_addr("DEBUG", "server_init", "server_addr", server_addr);
-        log_int("DEBUG", "server_init", "server_port", ntohs(server_addr->sin6_port));
-    }
-
-    if ((server_socket = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-        log_int("ERROR", "server_init", "server_socket", server_socket);
-    }
-
-    if (bind(server_socket, (struct sockaddr *) server_addr, server_addr_size) < 0) {
-        log_string("ERROR", "server_init", "bind_server_socket", "bind failed");
-    }
-
-    initialized_server = true;
-    server_is_running = true;
-}
-
 
 void server_start_listening(void) {
-    unsigned int client_addr_len = sizeof(struct sockaddr_in6);
-    struct sockaddr_in6 client_addr;
-
-    while (server_is_running) {
-        clear_socket_buffer();
-        int length = recvfrom(server_socket, socket_buffer, sizeof(socket_buffer) - 1, 0,
-                              (struct sockaddr *) &client_addr,
-                              &client_addr_len);
-
-        if (length < 0) {
-            log_int("ERROR", "server_start_listening", "recvfrom", length);
-            break;
-        }
-        socket_buffer[length] = '\0';
-        socket_buffer_length = length;
-
-        if (server_is_running) {
-            handle_incoming_message(server_socket, &client_addr);
-        } else {
-            clear_socket_buffer();
-        }
-    }
+    server_init();
+    server_is_running = true;
+    /* start to advertise this node */
+    start_advertise();
 }
 
 void server_stop(void) {
+    ble_gap_adv_stop();
     server_is_running = false;
-    status_received_packets_error = 0;
-    status_received_packets_successful = 0;
-    status_send_packets = 0;
+
+    status_error_count = 0;
+    status_access_denied_count = 0;
+    status_access_granted_count = 0;
+
+    status_access_status_read_request_count = 0;
+    status_did_read_request_count = 0;
+    status_did_write_request_count = 0;
+    status_error_read_request_count = 0;
 }
 
 void server_status(void) {
     //Todo: Rethink it. Maybe return a struct instead. Log instead in shell_cmds
-    printf("Received %lu correct packets\n", status_received_packets_successful);
-    printf("Received %lu incorrect packets\n", status_received_packets_error);
-    printf("Send %lu packets\n", status_send_packets);
+    printf("-----Server status reporting-----\n\n");
+    printf("\t-----Control-----\n");
+    printf("\tError count: %lu\n", status_error_count);
+    printf("\tGranted access: %lu times\n", status_access_granted_count);
+    printf("\tGranted denied: %lu times\n", status_access_denied_count);
+
+    printf("\n\t-----Communication------\n");
+    printf("\tAccess status read requests: %lu\n", status_access_status_read_request_count);
+    printf("\tDID read requests: %lu\n", status_did_read_request_count);
+    printf("\tDID write requests: %lu\n", status_did_write_request_count);
+    printf("\tError read requests: %lu\n", status_error_read_request_count);
 }
 
 bool is_server_running(void) {
@@ -315,13 +455,12 @@ bool is_server_running(void) {
 }
 
 void *run_server_thread(void *args) {
+    log_message(DEBUG, "run_server_thread", "Bluetooth server", "Start listening...");
+
     (void) args;
 
-    struct sockaddr_in6 server_addr = {.sin6_addr = IPV6_ADDR_UNSPECIFIED};
-    server_init(&server_addr, sizeof(server_addr));
     server_start_listening();
     int value = 0;
-    close(server_socket);
     pthread_exit(&value);
     return 0;
 }

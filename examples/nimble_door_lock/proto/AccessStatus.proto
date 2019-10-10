@@ -1,0 +1,12 @@
+syntax = "proto2";
+package iotaDoorLock;
+
+message AccessStatus {
+    enum Code {
+        STATUS_GRANTED = 1;
+        STATUS_DENIED = 2;
+        STATUS_ERROR = 3;
+        STATUS_NO_CONNECTION_TO_GATEWAY = 6;
+    }
+    required Code status_code = 1;
+}

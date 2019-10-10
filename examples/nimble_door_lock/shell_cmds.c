@@ -1,4 +1,3 @@
-
 /**
  * File is depending on the OS. Replace if you use another OS.
  */
@@ -10,7 +9,7 @@
 #include "pthread.h"
 
 //OS
-#include <phydat.h>
+//#include <phydat.h>
 
 //Server
 extern void *run_server_thread(void *args);
@@ -27,11 +26,7 @@ static void shell_start_server_cmd(void *args) {
      * Runs on every OS, but the thread does not have a name in RIOT OS.
      * The thread is called pthread when using the ps command
      */
-    if (server_thread > 0) {
-        puts("BLE door lock server is already running.");
-    } else {
-        server_thread = pthread_create(&server_thread, NULL, &run_server_thread, args);
-    }
+    server_thread = pthread_create(&server_thread, NULL, &run_server_thread, args);
 }
 
 static void shell_stop_server_cmd(void *args){
@@ -55,25 +50,28 @@ int server_cmd(int argc, char **argv) {
         return 1;
     }
 
-    if (strcmp(argv[1], "start") == 0) {
+    if(is_start == 0 && is_server_running()){
+        printf("Server is already running!\n");
+    }
+    else if (is_start == 0) {
         start_time = xtimer_now64().ticks64;
         shell_start_server_cmd(argv[2]);
         return 0;
     }
 
-    if (strcmp(argv[1], "stop") == 0) {
+    if (is_stop == 0) {
         shell_stop_server_cmd(argv[2]);
         return 0;
     }
 
-    if(strcmp(argv[1], "status") == 0) {h
+    if(is_status == 0) {
         if(is_server_running()){
             uint64_t now = xtimer_now64().ticks64;
             uint64_t time_running = now - start_time;
-            printf("BLE server is running for %lu seconds\n", (uint32_t) (time_running / 1000000));
+            printf("Server is running for %lu seconds\n", (uint32_t) (time_running / 1000000));
             server_status();
         }else{
-            printf("BLE server is not running");
+            printf("Server is not running\n");
         }
         return 0;
     }

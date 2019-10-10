@@ -7,6 +7,14 @@ BOARD ?= nrf52dk
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
 
+# Include POSIX
+USEMODULE += pthread
+
+# Include Shell
+USEMODULE += shell
+USEMODULE += shell_commands
+USEMODULE += ps
+
 # Include NimBLE
 USEPKG += nimble
 USEMODULE += nimble_svc_gap
@@ -14,6 +22,8 @@ USEMODULE += nimble_svc_gatt
 
 # We also use the AD part of the BLE helper module
 USEMODULE += bluetil_ad
+
+USEPKG += nanopb
 
 # Comment this out to disable code in RIOT that does safety checking
 # which is not needed in a production environment but helps in the

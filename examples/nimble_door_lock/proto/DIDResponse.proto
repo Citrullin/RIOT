@@ -1,0 +1,10 @@
+syntax = "proto2";
+package iotaDoorLock;
+
+message DIDResponse {
+    enum Code {
+        SUCCESSFUL_SEND = 1;
+        SEND_ERROR = 2;
+    }
+    required Code code = 1;
+}
