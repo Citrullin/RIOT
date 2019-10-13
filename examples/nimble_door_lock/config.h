@@ -8,6 +8,10 @@
 #define DEVICE_INFO_MODEL "IOTA HID door lock with %s microcontroller."
 #define DEVICE_INFO_MANUFACTURER "IOTA HID door lock (Version: %s)\n"
 
+#define GATEWAY_SPI_BUS SPI_DEV(0)
+#define GATEWAY_SPI_CS_PIN GPIO_PIN(0,12)
+#define GATEWAY_SPI_MODE SPI_MODE_2
+
 #define DECODE_SCHEMA_SIZE 20
 #define DECODE_METHOD_SIZE 20
 #define DECODE_ID_SIZE 100

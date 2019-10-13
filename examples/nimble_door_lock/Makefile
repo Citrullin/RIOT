@@ -2,7 +2,7 @@
 APPLICATION = nimble_gatt
 
 # If no BOARD is found in the environment, use this default:
-BOARD ?= nrf52dk
+BOARD ?= nrf52840dk
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
@@ -22,6 +22,8 @@ USEMODULE += nimble_svc_gatt
 
 # We also use the AD part of the BLE helper module
 USEMODULE += bluetil_ad
+
+REQUIRED_FEATURE += periph_spi
 
 USEPKG += nanopb
 

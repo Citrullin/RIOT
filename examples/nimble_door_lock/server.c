@@ -30,8 +30,9 @@
 #include "proto_compiled/DIDResponse.pb.h"
 
 #include "crypto/ciphers.h"
+#include "periph/spi.h"
 
-char server_did_buffer[DID_BUFFER_SIZE];
+char server_transfer_buffer[DID_BUFFER_SIZE];
 char error_message_buffer[ERROR_BUFFER_SIZE];
 
 cipher_t cipher;
@@ -158,6 +159,11 @@ void clear_response_buffer(void) {
     response_buffer_length = 0;
 }
 
+typedef enum {
+    DID_CMD = 0x1,
+    ACCESS_STATUS_CMD = 0x2
+} door_lock_commands_t;
+
 //Encode
 extern int did_response_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_DIDResponse *message_ptr);
 extern int access_status_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_AccessStatus *message_ptr);
@@ -170,7 +176,7 @@ extern int did_request_decode(iotaDoorLock_DIDRequest *message_ptr,
                               uint8_t *encoded_msg_ptr, size_t decoded_msg_size);
 
 iotaDoorLock_DIDRequest did_request;
-
+iotaDoorLock_DIDResponse did_response;
 
 bool initialized_server = false;
 bool server_is_running = false;
@@ -233,9 +239,10 @@ static int gatt_svr_chr_access_device_info_model(
     return os_mbuf_append(ctxt->om, response_buffer, strlen(response_buffer));
 }
 
+iotaDoorLock_DIDResponse decode_response;
 int handle_did_write_request(struct ble_gatt_access_ctxt *ctxt){
     char func_name[] = "handle_did_write_request";
-    log_string(DEBUG, func_name, "server_did_buffer", server_did_buffer);
+    log_string(DEBUG, func_name, "server_transfer_buffer", server_transfer_buffer);
     status_did_write_request_count =+ 1;
 
     int rc = 0;
@@ -243,27 +250,36 @@ int handle_did_write_request(struct ble_gatt_access_ctxt *ctxt){
     om_len = OS_MBUF_PKTLEN(ctxt->om);
 
     /* read sent data */
-    rc = ble_hs_mbuf_to_flat(ctxt->om, &server_did_buffer,
-                             sizeof(server_did_buffer), &om_len);
+    rc = ble_hs_mbuf_to_flat(ctxt->om, &server_transfer_buffer,
+                             sizeof(server_transfer_buffer), &om_len);
     /* we need to null-terminate the received string */
-    server_did_buffer[om_len] = '\0';
+    server_transfer_buffer[om_len] = '\0';
 
-    log_string(DEBUG, func_name, "server_did_buffer", server_did_buffer);
+    log_string(DEBUG, func_name, "server_transfer_buffer", server_transfer_buffer);
 
-    did_request_decode(&did_request, (uint8_t *) server_did_buffer, om_len);
+    bool decode_status = did_request_decode(&did_request, (uint8_t *) server_transfer_buffer, om_len);
+
+    if(!decode_status){
+        did_response.code = iotaDoorLock_DIDResponse_Code_SEND_ERROR;
+    }else{
+        did_response.code = iotaDoorLock_DIDResponse_Code_SUCCESSFUL_SEND;
+
+        spi_acquire(GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, GATEWAY_SPI_MODE, SPI_CLK_10MHZ);
+        spi_transfer_byte (GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, true, DID_CMD);
+        spi_transfer_bytes(GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, false, server_transfer_buffer, NULL, om_len);
+        spi_release(GATEWAY_SPI_BUS);
+    }
 
     return rc;
 }
 
 int handle_did_read_request(struct ble_gatt_access_ctxt *ctxt){
-    log_string(DEBUG, "handle_did_read_request", "server_did_buffer", server_did_buffer);
+    log_string(DEBUG, "handle_did_read_request", "server_transfer_buffer", server_transfer_buffer);
 
-    int rc = 0;
-    /* send given data to the client */
-    rc = os_mbuf_append(ctxt->om, &server_did_buffer,
-                        strlen(server_did_buffer));
+    did_response_encode((uint8_t *) response_buffer, sizeof(response_buffer), &did_response);
 
-    return rc;
+    return os_mbuf_append(ctxt->om, &response_buffer,
+                          strlen(response_buffer));
 }
 
 int handle_error_message_read_request(struct ble_gatt_access_ctxt *ctxt){
@@ -273,8 +289,15 @@ int handle_error_message_read_request(struct ble_gatt_access_ctxt *ctxt){
     return os_mbuf_append(ctxt->om, &response_buffer, strlen(response_buffer));
 }
 
+iotaDoorLock_AccessStatus access_status;
+
 int handle_access_status_read_request(struct ble_gatt_access_ctxt *ctxt){
-    snprintf(response_buffer, RESPONSE_BUFFER_SIZE, "access not granted.");
+    spi_acquire(GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, GATEWAY_SPI_MODE, SPI_CLK_10MHZ);
+    uint8_t command = ACCESS_STATUS_CMD;
+    spi_transfer_bytes(GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, false, &command, server_transfer_buffer, 1);
+    spi_release(GATEWAY_SPI_BUS);
+
+    strncpy(response_buffer, server_transfer_buffer, strlen(server_transfer_buffer));
     log_string(DEBUG, "handle_access_status_read_request", "response_buffer", response_buffer);
 
     return os_mbuf_append(ctxt->om, &response_buffer, strlen(response_buffer));
@@ -374,6 +397,10 @@ pb_callback_t pb_did_id_cb;
 void server_init(void) {
     char func_name[] = "server_init";
     log_message(DEBUG, func_name, "Bluetooth server", "Initialize server...");
+
+    spi_init(GATEWAY_SPI_BUS);
+    spi_init_cs(GATEWAY_SPI_BUS,GATEWAY_SPI_CS_PIN);
+
     if(!initialized_server){
         int rc = 0;
 
