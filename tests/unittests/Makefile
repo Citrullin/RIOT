@@ -9,7 +9,6 @@ BOARD_BLACKLIST += arduino-mega2560
 BOARD_BLACKLIST += arduino-nano
 BOARD_BLACKLIST += arduino-uno
 BOARD_BLACKLIST += chronos
-BOARD_BLACKLIST += jiminy-mega256rfr2
 BOARD_BLACKLIST += mega-xplained
 BOARD_BLACKLIST += msb-430
 BOARD_BLACKLIST += msb-430h
@@ -88,6 +87,7 @@ BOARD_INSUFFICIENT_MEMORY := airfy-beacon \
                              sensebox_samd21 \
                              slstk3401a \
                              sltb001a \
+                             slwstk6000b-slwrb4150a \
                              slwstk6220a \
                              sodaq-autonomo \
                              sodaq-explorer \
