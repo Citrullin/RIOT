@@ -27,7 +27,10 @@ echo "alias python=python3" >> ~/.bashrc
 
 ### 6. Flash the application to the microcontroller
 
-Check the port before. Use the port your device is connected to. Example:
+Check the connected port before connecting the device. You can check all connected port with `ls /dev/ttyACM*`.
+When you connect the device, check all port again. There should be a new port. Use this one.
+
+Replace the variable. Example:
 $PORT = /dev/ttyACM3
 
 ```bash
@@ -40,6 +43,39 @@ make BOARD=nrf52840dk PORT=$PORT term flash
 You are now in the RIOT OS terminal. The server application is a registered command.
 You ran run it with `server start`. If you want to see all available commands. Execute `help`.
 
+## Open the shell (terminal)
+
+### 1. Connect the two micro USB cables to your board and PC/Notebook
+
+### 2. [Install ARM gcc toolchain](https://github.com/iotaledger/documentation/blob/develop/iot/0.1/how-to-guides/install-arm-gcc-toolchain.md)
+
+### 3. Install python 3 and pip
+
+```bash
+sudo apt-get install -y python3-all
+sudo apt-get install -y python-pip3
+```
+
+### 4. If your Linux distribution has Python 2 pre-installed, make sure that it uses Python 3 by default
+
+```bash
+echo "alias python=python3" >> ~/.bashrc
+```
+
+### 5. [Install the J-Link or J-Link OB toolchain](https://gnu-mcu-eclipse.github.io/debug/jlink/install/)
+
+### 6. Open the shell
+
+Check the connected port before connecting the device. You can check all connected port with `ls /dev/ttyACM*`.
+When you connect the device, check all port again. There should be a new port. Use this one.
+
+Replace the variable. Example:
+$PORT = /dev/ttyACM3
+
+```bash
+cd examples/nimble_door_lock
+make BOARD=nrf52840dk PORT=$PORT term
+```
 
 ## Bluetooth characteristics
 
