@@ -1,0 +1,7 @@
+syntax = "proto2";
+package iotaDoorLock;
+
+message ErrorResponse {
+    required string message = 1;
+    required uint32 time = 2;
+}

@@ -3,8 +3,9 @@ package iotaDoorLock;
 
 message DIDResponse {
     enum Code {
-        SUCCESSFUL_SEND = 1;
+        SUCCESSFUL_SENT = 1;
         SEND_ERROR = 2;
+        NO_CONNECTION_TO_GATEWAY = 3;
     }
     required Code code = 1;
 }

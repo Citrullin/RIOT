@@ -16,12 +16,13 @@ extern "C" {
 
 /* Enum definitions */
 typedef enum _iotaDoorLock_DIDResponse_Code {
-    iotaDoorLock_DIDResponse_Code_SUCCESSFUL_SEND = 1,
-    iotaDoorLock_DIDResponse_Code_SEND_ERROR = 2
+    iotaDoorLock_DIDResponse_Code_SUCCESSFUL_SENT = 1,
+    iotaDoorLock_DIDResponse_Code_SEND_ERROR = 2,
+    iotaDoorLock_DIDResponse_Code_NO_CONNECTION_TO_GATEWAY = 3
 } iotaDoorLock_DIDResponse_Code;
-#define _iotaDoorLock_DIDResponse_Code_MIN iotaDoorLock_DIDResponse_Code_SUCCESSFUL_SEND
-#define _iotaDoorLock_DIDResponse_Code_MAX iotaDoorLock_DIDResponse_Code_SEND_ERROR
-#define _iotaDoorLock_DIDResponse_Code_ARRAYSIZE ((iotaDoorLock_DIDResponse_Code)(iotaDoorLock_DIDResponse_Code_SEND_ERROR+1))
+#define _iotaDoorLock_DIDResponse_Code_MIN iotaDoorLock_DIDResponse_Code_SUCCESSFUL_SENT
+#define _iotaDoorLock_DIDResponse_Code_MAX iotaDoorLock_DIDResponse_Code_NO_CONNECTION_TO_GATEWAY
+#define _iotaDoorLock_DIDResponse_Code_ARRAYSIZE ((iotaDoorLock_DIDResponse_Code)(iotaDoorLock_DIDResponse_Code_NO_CONNECTION_TO_GATEWAY+1))
 
 /* Struct definitions */
 typedef struct _iotaDoorLock_DIDResponse {

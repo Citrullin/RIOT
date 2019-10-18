@@ -23,7 +23,7 @@ USEMODULE += nimble_svc_gatt
 # We also use the AD part of the BLE helper module
 USEMODULE += bluetil_ad
 
-REQUIRED_FEATURE += periph_spi
+USEMODULE += periph_uart
 
 USEPKG += nanopb
 

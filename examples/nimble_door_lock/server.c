@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "periph/uart.h"
+#include "xtimer.h"
+
 #include "config.h"
 #include "logging.h"
 
@@ -28,16 +31,22 @@
 #include "proto_compiled/AccessStatus.pb.h"
 #include "proto_compiled/DIDRequest.pb.h"
 #include "proto_compiled/DIDResponse.pb.h"
+#include "proto_compiled/ErrorResponse.pb.h"
 
 #include "crypto/ciphers.h"
-#include "periph/spi.h"
 
+//Todo: Check, if these bufers are really needed. Maybe use a ring buffer instead.
 char server_transfer_buffer[DID_BUFFER_SIZE];
+uint32_t server_transfer_buffer_written_size;
 char error_message_buffer[ERROR_BUFFER_SIZE];
+uint32_t error_message_buffer_written_size = 0;
 
+char gateway_response_buffer[GATEWAY_RESPONSE_BUFFER_SIZE];
+uint32_t gateway_response_buffer_size = 0;
+
+//Fixme: Send back encrypted or hashed DID, instead of clear text.
 cipher_t cipher;
-uint8_t did_key[AES_KEY_SIZE] = {0},
-    did_cipher_text[AES_BLOCK_SIZE] = {0};
+uint8_t did_key[AES_KEY_SIZE] = {0}, did_cipher_text[AES_BLOCK_SIZE] = {0};
 
 static const ble_uuid128_t gatt_svr_svc_rw_door_lock_uuid
     = BLE_UUID128_INIT( GATT_SERVICE_UUID );
@@ -67,12 +76,7 @@ static int gatt_svr_chr_access_rw_door_lock(
 
 static void start_advertise(void);
 
-/* define several bluetooth services for our device */
 static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
-    /*
-     * access_cb defines a callback for read and write access events on
-     * given characteristics
-     */
     {
         /* Service: Device Information */
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
@@ -134,6 +138,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     },
 };
 
+//Fixme: Status is not updated all the time. Add it everywhere.
 uint32_t status_access_status_read_request_count = 0;
 uint32_t status_did_write_request_count = 0;
 uint32_t status_did_read_request_count = 0;
@@ -146,6 +151,11 @@ uint32_t status_access_denied_count = 0;
 uint8_t encode_buffer[ENCODE_BUFFER_SIZE];
 size_t encode_buffer_length;
 
+uint8_t gateway_sleep_time_repeated = 0;
+
+iotaDoorLock_ErrorResponse error_response;
+
+//Todo: Same as the buffer variables. Check, if ring buffer can be used.
 void clear_encode_buffer(void) {
     memset(encode_buffer, 0, ENCODE_BUFFER_SIZE);
     encode_buffer_length = 0;
@@ -159,28 +169,38 @@ void clear_response_buffer(void) {
     response_buffer_length = 0;
 }
 
+//Todo: Refactoring of command names are possible.
 typedef enum {
-    DID_CMD = 0x1,
-    ACCESS_STATUS_CMD = 0x2
+    DID_WRITE_CMD = 0x41,
+    DID_WRITE_GATEWAY_RESPONSE_CMD = 0x42,
+    ACCESS_STATUS_READ_CMD = 0x43,
+    ACCESS_STATUS_READ_GATEWAY_RESPONSE_CMD = 0x44,
+    MESSAGE_END_CMD = 0x00
 } door_lock_commands_t;
 
 //Encode
+//Fixme: Same name structure as decode.
 extern int did_response_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_DIDResponse *message_ptr);
 extern int access_status_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_AccessStatus *message_ptr);
+extern int error_response_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_ErrorResponse *message_ptr);
+extern bool encode_error_message_cb(pb_ostream_t *stream, const pb_field_t *field, void * const *arg);
 
 //Decode
 extern bool decode_did_schema_cb(pb_istream_t *stream, const pb_field_t *field, void **arg);
 extern bool decode_did_method_cb(pb_istream_t *stream, const pb_field_t *field, void **arg);
 extern bool decode_did_id_cb(pb_istream_t *stream, const pb_field_t *field, void **arg);
+//Fixme: Consistency in function name pattern!
 extern int did_request_decode(iotaDoorLock_DIDRequest *message_ptr,
                               uint8_t *encoded_msg_ptr, size_t decoded_msg_size);
 
 iotaDoorLock_DIDRequest did_request;
 iotaDoorLock_DIDResponse did_response;
+iotaDoorLock_ErrorResponse error_response;
 
 bool initialized_server = false;
 bool server_is_running = false;
 
+//Todo: Refactor function name pattern for callbacks.
 static int gap_event_cb(struct ble_gap_event *event, void *arg) {
     (void) arg;
     char func_name[] = "gap_event_cb";
@@ -208,6 +228,7 @@ static int gatt_svr_chr_access_device_info_manufacturer(
     struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     char func_name[] = "gatt_svr_chr_access_device_info_manufacturer";
+    //Todo: All logs are on DEBUG level at the moment. Some can be changed to INFO level.
     log_message(DEBUG, func_name, "Bluetooth server", "callback of service 'device info: manufacturer' triggered.");
 
     (void) conn_handle;
@@ -240,6 +261,10 @@ static int gatt_svr_chr_access_device_info_model(
 }
 
 iotaDoorLock_DIDResponse decode_response;
+bool received_did_write_request_response = false;
+bool did_write_request_successful = false;
+
+//Todo: Refactor handler function. Use struct to store function ptr?
 int handle_did_write_request(struct ble_gatt_access_ctxt *ctxt){
     char func_name[] = "handle_did_write_request";
     log_string(DEBUG, func_name, "server_transfer_buffer", server_transfer_buffer);
@@ -249,30 +274,59 @@ int handle_did_write_request(struct ble_gatt_access_ctxt *ctxt){
     uint16_t om_len;
     om_len = OS_MBUF_PKTLEN(ctxt->om);
 
-    /* read sent data */
     rc = ble_hs_mbuf_to_flat(ctxt->om, &server_transfer_buffer,
                              sizeof(server_transfer_buffer), &om_len);
-    /* we need to null-terminate the received string */
+
     server_transfer_buffer[om_len] = '\0';
+    server_transfer_buffer_written_size = om_len;
 
     log_string(DEBUG, func_name, "server_transfer_buffer", server_transfer_buffer);
 
+    log_message(DEBUG, func_name, "Bluetooth server", "Decoding message");
+    //For checking, if the request is correct. Input validation
     bool decode_status = did_request_decode(&did_request, (uint8_t *) server_transfer_buffer, om_len);
 
-    if(!decode_status){
-        did_response.code = iotaDoorLock_DIDResponse_Code_SEND_ERROR;
-    }else{
-        did_response.code = iotaDoorLock_DIDResponse_Code_SUCCESSFUL_SEND;
+    if(decode_status){
+        log_message(DEBUG, func_name, "Bluetooth server", "Successfully decoded message.");
+        log_message(DEBUG, func_name, "Bluetooth server", "Sending message to Gateway...");
 
-        spi_acquire(GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, GATEWAY_SPI_MODE, SPI_CLK_10MHZ);
-        spi_transfer_byte (GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, true, DID_CMD);
-        spi_transfer_bytes(GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, false, server_transfer_buffer, NULL, om_len);
-        spi_release(GATEWAY_SPI_BUS);
+        char command[] = { DID_WRITE_CMD, '\0' };
+        log_string(DEBUG, func_name, "command", command);
+        uart_write(GATEWAY_UART_PORT, (const uint8_t *) command, 1);
+        uart_write(GATEWAY_UART_PORT, (const uint8_t *) server_transfer_buffer, om_len);
+
+        log_message(DEBUG, func_name, "Bluetooth server", "Sent message to Gateway.");
+
+        log_message(DEBUG, func_name, "Bluetooth server", "Waiting for Gateway response...");
+        while(!received_did_write_request_response && gateway_sleep_time_repeated < GATEWAY_REPEAT_SLEEP_TIME){
+            gateway_sleep_time_repeated += 1;
+            xtimer_usleep(GATEWAY_WAIT_SLEEP_TIME);
+        }
+
+        if(!received_did_write_request_response){
+            log_message(DEBUG, func_name, "Bluetooth server", "No connection to Gateway. Gateway did not respond.");
+            did_response.code = iotaDoorLock_DIDResponse_Code_NO_CONNECTION_TO_GATEWAY;
+        }else{
+            if(did_write_request_successful){
+                log_message(DEBUG, func_name, "Bluetooth server", "Successfully sent message.");
+                did_response.code = iotaDoorLock_DIDResponse_Code_SUCCESSFUL_SENT;
+            }else{
+                log_message(DEBUG, func_name, "Bluetooth server", "An error occurred. Check error endpoint for details.");
+                did_response.code = iotaDoorLock_DIDResponse_Code_SEND_ERROR;
+            }
+        }
+    }else{
+        did_response.code = iotaDoorLock_DIDResponse_Code_SEND_ERROR;
+        char msg[] = "Decoding of did_write_request protobuf message failed.";
+        strncpy(error_message_buffer, msg, sizeof(msg));
+        error_message_buffer_written_size = sizeof(msg);
+        error_response.time = xtimer_now_usec();
     }
 
     return rc;
 }
 
+//Todo: Implement DidResponse
 int handle_did_read_request(struct ble_gatt_access_ctxt *ctxt){
     log_string(DEBUG, "handle_did_read_request", "server_transfer_buffer", server_transfer_buffer);
 
@@ -283,21 +337,42 @@ int handle_did_read_request(struct ble_gatt_access_ctxt *ctxt){
 }
 
 int handle_error_message_read_request(struct ble_gatt_access_ctxt *ctxt){
-    strncpy(response_buffer, error_message_buffer, RESPONSE_BUFFER_SIZE);
+    int message_size = error_response_encode(encode_buffer, sizeof(encode_buffer), &error_response);
+
+    strncpy(response_buffer, (char *) encode_buffer, RESPONSE_BUFFER_SIZE);
     log_string(DEBUG, "handle_error_message_read_request", "response_buffer", response_buffer);
 
-    return os_mbuf_append(ctxt->om, &response_buffer, strlen(response_buffer));
+    return os_mbuf_append(ctxt->om, &response_buffer, message_size);
 }
 
 iotaDoorLock_AccessStatus access_status;
+bool got_access_status_response = false;
 
 int handle_access_status_read_request(struct ble_gatt_access_ctxt *ctxt){
-    spi_acquire(GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, GATEWAY_SPI_MODE, SPI_CLK_10MHZ);
-    uint8_t command = ACCESS_STATUS_CMD;
-    spi_transfer_bytes(GATEWAY_SPI_BUS, GATEWAY_SPI_CS_PIN, false, &command, server_transfer_buffer, 1);
-    spi_release(GATEWAY_SPI_BUS);
+    char func_name[] = "handle_access_status_read_request";
 
-    strncpy(response_buffer, server_transfer_buffer, strlen(server_transfer_buffer));
+    char command[] = { ACCESS_STATUS_READ_CMD, '\0' };
+    log_string(DEBUG, func_name, "command", command);
+    uart_write(GATEWAY_UART_PORT, (const uint8_t *) command, 1);
+    log_message(DEBUG, func_name, "Bluetooth server", "Sent message to Gateway.");
+
+    log_message(DEBUG, func_name, "Bluetooth server", "Waiting for Gateway response...");
+    //Todo: Refactoring of blocking wait blocks. Use threads instead for non blocking behavior.
+    while(!got_access_status_response && gateway_sleep_time_repeated < GATEWAY_REPEAT_SLEEP_TIME){
+        gateway_sleep_time_repeated += 1;
+        xtimer_usleep(GATEWAY_WAIT_SLEEP_TIME);
+    }
+
+    if(gateway_sleep_time_repeated == GATEWAY_REPEAT_SLEEP_TIME){
+        log_message(DEBUG, func_name, "Bluetooth server", "No connection to Gateway. Gateway did not respond.");
+        access_status.status_code = iotaDoorLock_AccessStatus_Code_STATUS_NO_CONNECTION_TO_GATEWAY;
+
+        int encoded_size = access_status_encode(encode_buffer, ENCODE_BUFFER_SIZE, &access_status);
+        strncpy(response_buffer, (char *) encode_buffer, encoded_size);
+    }else{
+        strncpy(response_buffer, server_transfer_buffer, strlen(server_transfer_buffer));
+    }
+
     log_string(DEBUG, "handle_access_status_read_request", "response_buffer", response_buffer);
 
     return os_mbuf_append(ctxt->om, &response_buffer, strlen(response_buffer));
@@ -390,16 +465,68 @@ static void start_advertise(void) {
     (void) rc;
 }
 
+//Todo: Change name schema and move definition to different file.
 pb_callback_t pb_did_method_cb;
 pb_callback_t pb_did_schema_cb;
 pb_callback_t pb_did_id_cb;
+pb_callback_t pb_error_response_message_cb;
+
+bool is_in_command_mode = true;
+bool is_write_did_gateway_response_cmd = false;
+bool is_read_access_status_gateway_response_cmd = false;
+
+//Todo: Refactor with threads for non-blocking behavior.
+void gateway_uart_callback(void *arg, uint8_t data){
+    (void) arg;
+
+    char func_name[] = "gateway_callback";
+
+    log_hex(DEBUG, func_name, "data", data);
+    log_bool(DEBUG, func_name, "is_in_command_mode", is_in_command_mode);
+    log_bool(DEBUG, func_name, "is_write_did_gateway_response_cmd", is_write_did_gateway_response_cmd);
+    log_bool(DEBUG, func_name, "is_read_access_status_gateway_response_cmd", is_read_access_status_gateway_response_cmd);
+
+    if(is_in_command_mode){
+        switch(data){
+            case DID_WRITE_GATEWAY_RESPONSE_CMD:
+                is_write_did_gateway_response_cmd = true;
+                is_in_command_mode = false;
+                break;
+            case ACCESS_STATUS_READ_GATEWAY_RESPONSE_CMD:
+                is_read_access_status_gateway_response_cmd = true;
+                is_in_command_mode = false;
+                break;
+            default:
+                break;
+        }
+    }else{
+        if(is_write_did_gateway_response_cmd){
+            if(data == 0x00){
+                did_write_request_successful = false;
+            }else{
+                did_write_request_successful = true;
+            }
+
+            is_write_did_gateway_response_cmd = false;
+            is_in_command_mode = true;
+        } else if(is_read_access_status_gateway_response_cmd){
+            if(data != MESSAGE_END_CMD){
+                gateway_response_buffer[gateway_response_buffer_size] = data;
+                gateway_response_buffer_size += 1;
+            }else{
+
+            }
+        }
+    }
+}
 
 void server_init(void) {
     char func_name[] = "server_init";
     log_message(DEBUG, func_name, "Bluetooth server", "Initialize server...");
 
-    spi_init(GATEWAY_SPI_BUS);
-    spi_init_cs(GATEWAY_SPI_BUS,GATEWAY_SPI_CS_PIN);
+    uart_poweron(GATEWAY_UART_PORT);
+    uart_rx_cb_t gateway_cb = &gateway_uart_callback;
+    uart_init(GATEWAY_UART_PORT, GATEWAY_UART_BAUDRATE, gateway_cb, NULL);
 
     if(!initialized_server){
         int rc = 0;
@@ -407,6 +534,13 @@ void server_init(void) {
         pb_did_id_cb.funcs.decode = &decode_did_id_cb;
         pb_did_method_cb.funcs.decode = &decode_did_method_cb;
         pb_did_schema_cb.funcs.decode = &decode_did_schema_cb;
+        pb_error_response_message_cb.funcs.encode = &encode_error_message_cb;
+
+        did_request.schema = pb_did_schema_cb;
+        did_request.method = pb_did_method_cb;
+        did_request.id = pb_did_id_cb;
+
+        error_response.message = pb_error_response_message_cb;
 
         log_message(DEBUG, func_name, "Bluetooth server", "Verify and add our custom services...");
         rc = ble_gatts_count_cfg(gatt_svr_svcs);
@@ -444,7 +578,6 @@ void server_init(void) {
 void server_start_listening(void) {
     server_init();
     server_is_running = true;
-    /* start to advertise this node */
     start_advertise();
 }
 

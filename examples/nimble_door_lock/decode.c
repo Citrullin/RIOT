@@ -74,7 +74,6 @@ bool decode_did_id_cb(pb_istream_t *stream, const pb_field_t *field, void **arg)
 };
 
 
-
 void log_did_buffers(char *func_name){
     log_string(DEBUG, func_name, "decode_schema_buffer", (char *) decode_schema_buffer);
     log_string(DEBUG, func_name, "decode_method_buffer", (char *) decode_method_buffer);
@@ -94,9 +93,9 @@ bool did_request_decode(iotaDoorLock_DIDRequest *message_ptr, uint8_t *encoded_m
     if (!decode_status) {
         log_message(FATAL, func_name, "Decoding failed", (char *) PB_GET_ERROR(&stream));
         strncpy(decode_error_message_buffer, (char *) PB_GET_ERROR(&stream), sizeof(decode_error_message_buffer));
+    }else{
+        log_did_buffers(func_name);
     }
-
-    log_did_buffers(func_name);
 
     return decode_status;
 }
