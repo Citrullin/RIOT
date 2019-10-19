@@ -40,6 +40,9 @@ PKGDIRBASE     ?= $(BINDIRBASE)/pkg/$(BOARD)
 DLCACHE        ?= $(RIOTTOOLS)/dlcache/dlcache.sh
 DLCACHE_DIR    ?= $(RIOTBASE)/.dlcache
 
+# include CI info such as BOARD_INSUFFICIENT_MEMORY, if existing
+-include Makefile.ci
+
 __DIRECTORY_VARIABLES := \
   RIOTBASE \
   RIOTCPU \
@@ -100,11 +103,17 @@ CLEAN = $(filter clean, $(MAKECMDGOALS))
 include $(RIOTMAKE)/utils/variables.mk
 include $(RIOTMAKE)/utils/strings.mk
 
-# get host operating system
-OS := $(shell uname)
+
+# UNAME is always needed so use simple variable expansion so only evaluated once
+UNAME := $(shell uname -m -s)
+OS = $(word 1, $(UNAME))
+OS_ARCH = $(word 2, $(UNAME))
 
 # set python path, e.g. for tests
 PYTHONPATH := $(RIOTBASE)/dist/pythonlibs/:$(PYTHONPATH)
+
+# Basic utilities included before anything else
+include $(RIOTMAKE)/utils/checks.mk
 
 # Include Docker settings near the top because we need to build the environment
 # command line before some of the variable origins are overwritten below when
@@ -280,6 +289,10 @@ export PREFIX ?= $(if $(TARGET_ARCH),$(TARGET_ARCH)-)
 # be done in makefile.iotlab.single.inc.mk which is included after.
 ifneq (,$(IOTLAB_NODE))
   PROGRAMMER ?= iotlab
+  # iotlab uses ELFFILE by default for flashing boards, except for WSN430.
+  ifeq (,$(filter wsn430-%,$(BOARD)))
+    FLASHFILE ?= $(ELFFILE)
+  endif
 endif
 
 # Add standard include directories
@@ -438,6 +451,11 @@ include $(RIOTMAKE)/modules.inc.mk
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # https://www.gnu.org/software/make/manual/html_node/Force-Targets.html
 .PHONY: FORCE
+
+ifneq (,$(IOTLAB_NODE))
+  # iot-lab serial and flasher
+  include $(RIOTBASE)/dist/testbed-support/makefile.iotlab.single.inc.mk
+endif
 
 ELFFILE ?= $(BINDIR)/$(APPLICATION).elf
 HEXFILE ?= $(ELFFILE:.elf=.hex)
@@ -637,16 +655,19 @@ flash-only: $(FLASHDEPS)
 preflash: $(BUILD_BEFORE_FLASH)
 	$(PREFLASHER) $(PREFFLAGS)
 
+TERMFLASHDEPS ?= $(filter flash flash-only,$(MAKECMDGOALS))
+# Add TERMFLASHDEPS to TERMDEPS so it also applies to `test`
+TERMDEPS += $(TERMFLASHDEPS)
 termdeps: $(TERMDEPS)
 
-term: $(filter flash flash-only, $(MAKECMDGOALS)) $(TERMDEPS)
+term: $(TERMDEPS)
 	$(call check_cmd,$(TERMPROG),Terminal program)
 	$(TERMPROG) $(TERMFLAGS)
 
 # Term without the pyterm added logging
 # TERMFLAGS must be exported for `jlink.sh term_rtt`.
 cleanterm: export PYTERMFLAGS += --noprefix --no-repeat-command-on-empty-line
-cleanterm: $(filter flash, $(MAKECMDGOALS)) $(TERMDEPS)
+cleanterm: $(TERMDEPS)
 	$(call check_cmd,$(TERMPROG),Terminal program)
 	$(TERMPROG) $(TERMFLAGS)
 
@@ -739,6 +760,13 @@ ifneq (, $(filter all flash, $(if $(MAKECMDGOALS), $(MAKECMDGOALS), all)))
     EXPECT_ERRORS := 1
   endif
 
+  # Test if no feature in the requirements used is blacklisted for the selected board.
+  ifneq (,$(FEATURES_USED_BLACKLISTED))
+    $(shell $(COLOR_ECHO) "$(COLOR_RED)Some feature requirements are blacklisted:$(COLOR_RESET)"\
+                          "$(FEATURES_USED_BLACKLISTED)" 1>&2)
+    EXPECT_ERRORS := 1
+  endif
+
   # Test if any used feature conflict with another one.
   ifneq (,$(FEATURES_CONFLICTING))
     $(shell $(COLOR_ECHO) "$(COLOR_YELLOW)The following features may conflict:$(COLOR_RESET)"\
@@ -796,10 +824,6 @@ ifneq (,$(filter iotlab-m3 wsn430-v1_3b wsn430-v1_4,$(BOARD)))
   ifneq (,$(filter iotlab-%,$(MAKECMDGOALS)))
     include $(RIOTBASE)/dist/testbed-support/Makefile.iotlab
   endif
-endif
-ifneq (,$(IOTLAB_NODE))
-  # iot-lab serial and flasher
-  include $(RIOTBASE)/dist/testbed-support/makefile.iotlab.single.inc.mk
 endif
 
 # Include desvirt Makefile
