@@ -15,6 +15,8 @@ extern void *run_server_thread(void *args);
 extern void server_stop(void);
 extern void server_status(void);
 extern bool is_server_running(void);
+extern void server_info(void);
+
 extern char error_message_buffer[ERROR_BUFFER_SIZE];
 extern uint32_t error_message_buffer_written_size;
 
@@ -41,10 +43,11 @@ static void shell_stop_server_cmd(void *args){
     server_stop();
 }
 
-static void shell_did_request_example_cmd(void *args){
+static void shell_server_info_cmd(void *args){
     (void) args;
-
+    server_info();
 }
+
 
 static void shell_error_message_cmd(int argc, char **args){
     int is_message = strcmp(args[1], "message");
@@ -67,13 +70,17 @@ int server_cmd(int argc, char **argv) {
     int is_stop = strcmp(argv[1], "stop");
     int is_status = strcmp(argv[1], "status");
     int is_error = strcmp(argv[1], "error");
+    int is_info = strcmp(argv[1], "info");
 
-    if (argc < 1 || (is_start != 0 && is_stop != 0 && is_status != 0 && is_error != 0) ) {
-        printf("usage: %s [start|stop|status|error]\n", argv[0]);
+    if (argc < 1 || (is_start != 0 && is_stop != 0 && is_status != 0 && is_error != 0 && is_info != 0) ) {
+        printf("usage: %s [start|stop|status|error|info]\n", argv[0]);
         return 1;
     }
 
-    if(is_error == 0){
+    if(is_info == 0){
+        shell_server_info_cmd(argv[2]);
+    }
+    else if(is_error == 0){
         shell_error_message_cmd(argc - 1, &argv[1]);
     }
     else if(is_start == 0 && is_server_running()){

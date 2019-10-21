@@ -610,6 +610,19 @@ void server_status(void) {
     printf("\tError read requests: %lu\n", status_error_read_request_count);
 }
 
+void server_info(void){
+    char uuid_str[37];
+    printf("====== BLE Info ======\n");
+    ble_uuid_to_str((const ble_uuid_t *) &gatt_svr_svc_rw_door_lock_uuid, uuid_str);
+    printf("Service UUID: %s\n", uuid_str);
+    ble_uuid_to_str((const ble_uuid_t *) &gatt_svr_svc_chr_w_did_uuid, uuid_str);
+    printf("Did characteristic UUID: %s\n", uuid_str);
+    ble_uuid_to_str((const ble_uuid_t *) &gatt_svr_svc_chr_r_access_status_uuid, uuid_str);
+    printf("Access status characteristic UUID: %s\n", uuid_str);
+    ble_uuid_to_str((const ble_uuid_t *) &gatt_svr_chr_r_error_message_uuid, uuid_str);
+    printf("Error status characteristic UUID: %s\n", uuid_str);
+}
+
 bool is_server_running(void) {
     return server_is_running;
 }

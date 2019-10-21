@@ -15,6 +15,8 @@
 #include "config.h"
 #include "logging.h"
 
+extern char error_message_buffer[ERROR_BUFFER_SIZE];
+extern uint32_t error_message_buffer_written_size;
 
 void log_encode_result(char * func_name, bool encode_status, size_t encode_message_length){
     log_bool(DEBUG, func_name, "encode_status", encode_status);
@@ -101,13 +103,15 @@ pb_callback_t pb_encode_did_method_cb;
 pb_callback_t pb_encode_did_schema_cb;
 
 int did_request_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_DIDRequest *message_ptr) {
-    char func_name[] = "did_request_encode";
-
-
+    (void) buffer;
+    (void) buffer_size;
+    //char func_name[] = "did_request_encode";
 
     message_ptr->id = pb_did_id_cb;
     message_ptr->method = pb_did_method_cb;
     message_ptr->schema = pb_did_schema_cb;
+
+    return 0;
 }
 
 int did_response_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_DIDResponse *message_ptr) {
@@ -150,9 +154,6 @@ int access_status_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_Acces
 
     return encode_message_length;
 }
-
-extern char error_message_buffer[ERROR_BUFFER_SIZE];
-extern uint32_t error_message_buffer_written_size;
 
 bool encode_error_message_cb(pb_ostream_t *stream, const pb_field_t *field, void * const *arg){
     (void) arg;
