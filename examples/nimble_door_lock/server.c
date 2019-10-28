@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "periph/uart.h"
+//#include "periph/spi.h"
 #include "xtimer.h"
 
 #include "config.h"
@@ -35,6 +36,8 @@
 
 #include "crypto/ciphers.h"
 
+//Fixme: Check for uninitialized variables, memory safety etc.
+//Todo: Improve code quality. Coding was rushed.
 //Todo: Check, if these bufers are really needed. Maybe use a ring buffer instead.
 char server_transfer_buffer[DID_BUFFER_SIZE];
 uint32_t server_transfer_buffer_written_size;
@@ -170,6 +173,7 @@ void clear_response_buffer(void) {
 }
 
 //Todo: Refactoring of command names are possible.
+//Todo: Not used in NodeJS app.
 typedef enum {
     DID_WRITE_CMD = 0x41,
     DID_WRITE_GATEWAY_RESPONSE_CMD = 0x42,
@@ -179,7 +183,7 @@ typedef enum {
 } door_lock_commands_t;
 
 //Encode
-//Fixme: Same name structure as decode.
+//Fixme: Use consistent name structure with decode.
 extern int did_response_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_DIDResponse *message_ptr);
 extern int access_status_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_AccessStatus *message_ptr);
 extern int error_response_encode(uint8_t *buffer, size_t buffer_size, iotaDoorLock_ErrorResponse *message_ptr);
@@ -265,6 +269,8 @@ bool received_did_write_request_response = false;
 bool did_write_request_successful = false;
 
 //Todo: Refactor handler function. Use struct to store function ptr?
+//Todo: Remove all protobuf encodings/decodings, because they want to use NodeJS and JSON.
+//Fixme: Because of JSON implementation, check if Rpi still lives, it not implemented. Implement it.
 int handle_did_write_request(struct ble_gatt_access_ctxt *ctxt){
     char func_name[] = "handle_did_write_request";
     log_string(DEBUG, func_name, "server_transfer_buffer", server_transfer_buffer);
@@ -282,51 +288,28 @@ int handle_did_write_request(struct ble_gatt_access_ctxt *ctxt){
 
     log_string(DEBUG, func_name, "server_transfer_buffer", server_transfer_buffer);
 
-    log_message(DEBUG, func_name, "Bluetooth server", "Decoding message");
-    //For checking, if the request is correct. Input validation
-    bool decode_status = did_request_decode(&did_request, (uint8_t *) server_transfer_buffer, om_len);
+    /*char command[] = { DID_WRITE_CMD, '\0' };
+    log_string(DEBUG, func_name, "command", command);
+    uart_write(GATEWAY_UART_PORT, (const uint8_t *) command, 1);
+     */
 
-    if(decode_status){
-        log_message(DEBUG, func_name, "Bluetooth server", "Successfully decoded message.");
-        log_message(DEBUG, func_name, "Bluetooth server", "Sending message to Gateway...");
+    uart_write(GATEWAY_UART_PORT, (const uint8_t *) server_transfer_buffer, server_transfer_buffer_written_size);
 
-        char command[] = { DID_WRITE_CMD, '\0' };
-        log_string(DEBUG, func_name, "command", command);
-        uart_write(GATEWAY_UART_PORT, (const uint8_t *) command, 1);
-        uart_write(GATEWAY_UART_PORT, (const uint8_t *) server_transfer_buffer, om_len);
-
-        log_message(DEBUG, func_name, "Bluetooth server", "Sent message to Gateway.");
-
-        log_message(DEBUG, func_name, "Bluetooth server", "Waiting for Gateway response...");
-        while(!received_did_write_request_response && gateway_sleep_time_repeated < GATEWAY_REPEAT_SLEEP_TIME){
-            gateway_sleep_time_repeated += 1;
-            xtimer_usleep(GATEWAY_WAIT_SLEEP_TIME);
-        }
-
-        if(!received_did_write_request_response){
-            log_message(DEBUG, func_name, "Bluetooth server", "No connection to Gateway. Gateway did not respond.");
-            did_response.code = iotaDoorLock_DIDResponse_Code_NO_CONNECTION_TO_GATEWAY;
-        }else{
-            if(did_write_request_successful){
-                log_message(DEBUG, func_name, "Bluetooth server", "Successfully sent message.");
-                did_response.code = iotaDoorLock_DIDResponse_Code_SUCCESSFUL_SENT;
-            }else{
-                log_message(DEBUG, func_name, "Bluetooth server", "An error occurred. Check error endpoint for details.");
-                did_response.code = iotaDoorLock_DIDResponse_Code_SEND_ERROR;
-            }
-        }
-    }else{
-        did_response.code = iotaDoorLock_DIDResponse_Code_SEND_ERROR;
-        char msg[] = "Decoding of did_write_request protobuf message failed.";
-        strncpy(error_message_buffer, msg, sizeof(msg));
-        error_message_buffer_written_size = sizeof(msg);
-        error_response.time = xtimer_now_usec();
-    }
+    //Todo: Implement for faster communication
+    /*
+    log_message(DEBUG, func_name, "Bluetooth server", "Send transfer buffer content to SPI");
+    log_int(DEBUG, func_name, "server_transfer_buffer_written_size", server_transfer_buffer_written_size);
+    int spi_rsp = spi_acquire(SPI_BUS, SPI_CS_PIN, SPI_MODE, SPI_CLK);
+    log_int(DEBUG, func_name, "SPI_RESPONSE_CODE", spi_rsp);
+    spi_transfer_bytes(SPI_BUS, SPI_CS_PIN, false, server_transfer_buffer, NULL, server_transfer_buffer_written_size);
+    spi_release(SPI_BUS);
+     */
 
     return rc;
 }
 
 //Todo: Implement DidResponse
+//Todo: Not implemented by Android app and NodeJS
 int handle_did_read_request(struct ble_gatt_access_ctxt *ctxt){
     log_string(DEBUG, "handle_did_read_request", "server_transfer_buffer", server_transfer_buffer);
 
@@ -348,6 +331,7 @@ int handle_error_message_read_request(struct ble_gatt_access_ctxt *ctxt){
 iotaDoorLock_AccessStatus access_status;
 bool got_access_status_response = false;
 
+//Todo: Not used by NodeJS and Android app.
 int handle_access_status_read_request(struct ble_gatt_access_ctxt *ctxt){
     char func_name[] = "handle_access_status_read_request";
 
@@ -527,6 +511,13 @@ void server_init(void) {
     uart_poweron(GATEWAY_UART_PORT);
     uart_rx_cb_t gateway_cb = &gateway_uart_callback;
     uart_init(GATEWAY_UART_PORT, GATEWAY_UART_BAUDRATE, gateway_cb, NULL);
+
+
+    /*spi_init(SPI_BUS);
+    int spi_rsp = spi_init_cs(SPI_BUS, SPI_CS_PIN);
+
+    log_int(DEBUG, func_name, "SPI_RESPONSE_CODE", spi_rsp);
+*/
 
     if(!initialized_server){
         int rc = 0;

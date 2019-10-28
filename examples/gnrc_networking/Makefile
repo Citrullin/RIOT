@@ -31,6 +31,8 @@ USEMODULE += netstats_l2
 USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
 
+CFLAGS=-DGNRC_IPV6_NIB_CONF_SLAAC=1
+
 # Comment this out to disable code in RIOT that does safety checking
 # which is not needed in a production environment but helps in the
 # development process:

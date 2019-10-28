@@ -32,6 +32,7 @@
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
+
 extern int server_cmd(int argc, char **argv);
 
 static const shell_command_t shell_commands[] = {
