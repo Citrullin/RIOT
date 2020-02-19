@@ -146,9 +146,22 @@ ATCA_STATUS hal_i2c_wake(ATCAIface iface)
     ATCAIfaceCfg *cfg = atgetifacecfg(iface);
     uint8_t data[4] = { 0 };
 
+#ifdef MODULE_SAM0_COMMON_PERIPH
+    /* switch the pin MUX to GPIO function */
+    gpio_init_mux(i2c_config[cfg->atcai2c.bus].sda_pin, GPIO_MUX_A);
+    gpio_init(i2c_config[cfg->atcai2c.bus].sda_pin, GPIO_OUT);
+    /* send wake pulse of 100us (t_WOL) */
+    gpio_clear(i2c_config[cfg->atcai2c.bus].sda_pin);
+    atca_delay_us(100);
+    /* mux back to I2C peripheral */
+    gpio_init_mux(i2c_config[cfg->atcai2c.bus].sda_pin, i2c_config[cfg->atcai2c.bus].mux);
+#else
+    /* send wake pulse by sending byte 0x00 */
+    /* this requires the I2C clock to be 100kHz at a max */
     i2c_acquire(cfg->atcai2c.bus);
     i2c_write_byte(cfg->atcai2c.bus, ATCA_WAKE_ADDR, data[0], 0);
     i2c_release(cfg->atcai2c.bus);
+#endif
 
     atca_delay_us(cfg->wake_delay);
 
