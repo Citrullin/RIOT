@@ -134,6 +134,8 @@ enum {
     SAUL_SENSE_ID_VOLTAGE,          /**< sensor: voltage */
     SAUL_SENSE_ID_PH,               /**< sensor: pH */
     SAUL_SENSE_ID_POWER,            /**< sensor: power */
+    SAUL_SENSE_ID_FLOW,             /**< sensor: flow */
+    SAUL_SENSE_ID_VOLUME,           /**< sensor: volume */
     SAUL_SENSE_NUMOF                /**< Number of actuators supported */
     /* Extend this list as needed, but keep SAUL_SENSE_ID_ANY the first and
      * SAUL_SENSE_NUMOF the last entry
@@ -180,7 +182,9 @@ enum {
     SAUL_SENSE_VOLTAGE      = SAUL_CAT_SENSE | SAUL_SENSE_ID_VOLTAGE,       /**< sensor: voltage */
     SAUL_SENSE_PH           = SAUL_CAT_SENSE | SAUL_SENSE_ID_PH,            /**< sensor: pH */
     SAUL_SENSE_POWER        = SAUL_CAT_SENSE | SAUL_SENSE_ID_POWER,         /**< sensor: power */
-    SAUL_CLASS_ANY          = 0xff                                      /**< any device - wildcard */
+    SAUL_SENSE_FLOW         = SAUL_CAT_SENSE | SAUL_SENSE_ID_FLOW,          /**< sensor: flow */
+    SAUL_SENSE_VOLUME       = SAUL_CAT_SENSE | SAUL_SENSE_ID_VOLUME,        /**< sensor: volume */
+    SAUL_CLASS_ANY          = 0xff                                          /**< any device - wildcard */
     /* extend this list as needed... */
 };
 

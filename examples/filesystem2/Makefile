@@ -24,7 +24,7 @@ USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
 USEMODULE += xtimer
-USEMODULE += pulse_counter
+#USEMODULE += pulse_counter
 
 USEMODULE += saul_default
 

@@ -7,6 +7,7 @@ BOARD ?= native
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
 
+USEMODULE += turbine_flow_meter
 # we want to use SAUL:
 USEMODULE += saul_default
 # include the shell:

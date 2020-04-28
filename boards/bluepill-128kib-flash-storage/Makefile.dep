@@ -1,0 +1,7 @@
+ifneq (,$(filter saul_default,$(USEMODULE)))
+  USEMODULE += saul_gpio
+  USEMODULE += turbine_flow_meter
+endif
+
+USEMODULE += devfs
+USEMODULE += mtd_spi_nor

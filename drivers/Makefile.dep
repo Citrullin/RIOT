@@ -640,6 +640,12 @@ ifneq (,$(filter tsl4531x,$(USEMODULE)))
   USEMODULE += xtimer
 endif
 
+ifneq (,$(filter turbine_flow_meter,$(USEMODULE)))
+  USEMODULE += xtimer
+  USEMODULE += pulse_counter
+  FEATURES_REQUIRED += periph_gpio
+endif
+
 ifneq (,$(filter uart_half_duplex,$(USEMODULE)))
   FEATURES_REQUIRED += periph_gpio
   FEATURES_REQUIRED += periph_uart

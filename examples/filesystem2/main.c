@@ -237,66 +237,12 @@ static int _tee(int argc, char **argv)
     return 0;
 }
 
-pulse_counter_t pulse_counter;
-static pulse_counter_params_t pulse_counter_params = {
-        .gpio = GPIO_PIN(PORT_A, 1),
-        .gpio_flank = GPIO_BOTH,
-};
-int flow_meter_init(int argc, char **argv){
-    (void) argv;
-    if(argc != 2){
-        printf("Usage: %s %s\n", argv[0], argv[1]);
-        return 1;
-    }
-
-    if(pulse_counter_init(&pulse_counter, &pulse_counter_params) == -1){
-        puts("Error while initializing flow_meter");
-        return 1;
-    }
-
-    return 0;
-}
-
-int flow_meter_read(int argc, char **argv){
-    if(argc != 3){
-        printf("Usage: %s %s <seconds>\n", argv[0], argv[1]);
-        return 1;
-    }
-
-    int seconds = atoi(argv[2]);
-    printf("Will measure for %i seconds...\n", seconds);
-    pulse_counter_reset(&pulse_counter);
-    xtimer_sleep(seconds);
-    int16_t pulses = pulse_counter_read_with_reset(&pulse_counter);
-    //Liter/h
-    int result = ((pulses / seconds) * 60 / 7.5);
-    printf("Result: %i Liter/hour\n", result);
-
-    return 0;
-}
-
-static int flow_meter(int argc, char **argv){
-    if (argc > 3 || argc < 2) {
-        printf("Usage: %s <command> (<value>)\n", argv[0]);
-        return 1;
-    }
-
-    if(strcmp(argv[1], "init") == 0){
-        return flow_meter_init(argc, argv);
-    } else if(strcmp(argv[1], "read") == 0){
-        return flow_meter_read(argc, argv);
-    }
-
-    return 0;
-}
-
 static const shell_command_t shell_commands[] = {
     { "mount", "mount flash filesystem", _mount },
     { "format", "format flash file system", _format },
     { "umount", "unmount flash filesystem", _umount },
     { "cat", "print the content of a file", _cat },
     { "tee", "write a string in a file", _tee },
-    { "flow_meter", "interact with the flow meter", flow_meter },
     { NULL, NULL, NULL }
 };
 

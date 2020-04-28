@@ -322,6 +322,10 @@ ifneq (,$(filter tsl4531x,$(USEMODULE)))
   USEMODULE_INCLUDES += $(RIOTBASE)/drivers/tsl4531x/include
 endif
 
+ifneq (,$(filter turbine_flow_meter,$(USEMODULE)))
+  USEMODULE_INCLUDES += $(RIOTBASE)/drivers/turbine_flow_meter/include
+endif
+
 ifneq (,$(filter uart_half_duplex,$(USEMODULE)))
   USEMODULE_INCLUDES += $(RIOTBASE)/drivers/uart_half_duplex/include
 endif

@@ -571,6 +571,10 @@ void auto_init(void)
     extern void auto_init_tsl4531x(void);
     auto_init_tsl4531x();
 #endif
+#ifdef MODULE_TURBINE_FLOW_METER
+    extern void auto_init_turbine_flow_meter(void);
+    auto_init_turbine_flow_meter();
+#endif
 #ifdef MODULE_VCNL40X0
     extern void auto_init_vcnl40x0(void);
     auto_init_vcnl40x0();
