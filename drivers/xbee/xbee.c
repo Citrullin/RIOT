@@ -233,9 +233,7 @@ static void _rx_cb(void *arg, uint8_t c)
             dev->rx_buf[dev->rx_count++] = c;
             if (dev->rx_count == dev->rx_limit) {
                 /* packet is complete */
-                if (dev->event_callback) {
-                    dev->event_callback((netdev_t *)dev, NETDEV_EVENT_ISR);
-                }
+                netdev_trigger_event_isr((netdev_t*) dev);
                 dev->int_state = XBEE_INT_STATE_IDLE;
             }
             break;
@@ -601,6 +599,14 @@ int xbee_init(netdev_t *dev)
     _at_cmd(xbee, "ATMM2\r");
     /* put XBee module in "API mode without escaped characters" */
     _at_cmd(xbee, "ATAP1\r");
+    /* disable xbee CTS and RTS, unless hardware flow control is used */
+    if(!IS_USED(MODULE_PERIPH_UART_HW_FC)) {
+        DEBUG("[xbee] init: WARNING if using an arduino BOARD + arduino xbee " \
+            "shield with ICSP connector, hardware flow control can't be " \
+            "used since CTS pin is connected to ICSP RESET pin\n");
+        _at_cmd(xbee, "ATD6 0\r");
+        _at_cmd(xbee, "ATD7 0\r");
+    }
     /* apply AT commands */
     _at_cmd(xbee, "ATAC\r");
     /* exit command mode */
@@ -664,7 +670,9 @@ static int xbee_send(netdev_t *dev, const iolist_t *iolist)
     DEBUG("[xbee] send: now sending out %i byte\n", (int)size);
     mutex_lock(&(xbee->tx_lock));
     for (const iolist_t *iol = iolist; iol; iol = iol->iol_next) {
-        uart_write(xbee->p.uart, iol->iol_base, iol->iol_len);
+        if (iol->iol_len > 0) {
+            uart_write(xbee->p.uart, iol->iol_base, iol->iol_len);
+        }
     }
     uart_write(xbee->p.uart, &csum, 1);
     mutex_unlock(&(xbee->tx_lock));

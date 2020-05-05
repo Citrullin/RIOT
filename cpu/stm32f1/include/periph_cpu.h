@@ -62,12 +62,6 @@ extern "C" {
 #define PM_NUM_MODES        (2U)
 
 /**
- * @brief   Override the default initial PM blocker
- * @todo   we block all modes per default, until PM is cleanly implemented
- */
-#define PM_BLOCKER_INITIAL  { .val_u32 = 0x01010101 }
-
-/**
  * @brief  Define the config flag for stop mode
  */
 #define PM_STOP_CONFIG      (PWR_CR_LPDS)
@@ -138,6 +132,23 @@ typedef struct {
     uint8_t dev;            /**< ADCx - 1 device used for the channel */
     uint8_t chan;           /**< CPU ADC channel connected to the pin */
 } adc_conf_t;
+
+/**
+ * @name    Real time counter configuration
+ * @{
+ */
+#define RTT_IRQ_PRIO        1
+
+#define RTT_DEV             RTC
+#define RTT_IRQ             RTC_IRQn
+#define RTT_ISR             isr_rtc
+
+#define RTT_MAX_VALUE       (0xffffffff)
+#define RTT_CLOCK_FREQUENCY (32768U)                  /* in Hz */
+#define RTT_MIN_FREQUENCY   (1U)                      /* in Hz */
+/* RTC frequency of 32kHz is not recommended, see RM0008 Rev 20, p490 */
+#define RTT_MAX_FREQUENCY   (RTT_CLOCK_FREQUENCY / 2) /* in Hz */
+/** @} */
 
 #ifdef __cplusplus
 }

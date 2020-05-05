@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "assert.h"
+#include "test_utils/expect.h"
 #include "cn-cbor/cn-cbor.h"
 #include "embUnit.h"
 #include "fmt.h"
@@ -58,7 +58,7 @@ static cn_cbor_context ct =
 static void *cbor_calloc(size_t count, size_t size, void *memblock)
 {
     (void)count;
-    assert(count == 1); /* Count is always 1 with cn-cbor */
+    expect(count == 1); /* Count is always 1 with cn-cbor */
     void *block = memarray_alloc(memblock);
     if (block) {
         memset(block, 0, size);
@@ -134,7 +134,7 @@ static void test_parse(void)
         "bf61610161629f0203ffff",   // {_ "a": 1, "b": [_ 2, 3]}
     };
 
-    for (test = 0; test < sizeof(tests) / sizeof(char*); test++) {
+    for (test = 0; test < ARRAY_SIZE(tests); test++) {
         unsigned char buf[64] = {0};
         TEST_ASSERT((strlen(tests[test])/2) <= sizeof(buf));
 
@@ -172,7 +172,7 @@ static void test_errors(void)
     TEST_ASSERT_EQUAL_INT(-1, cn_cbor_encoder_write(ebuf, 0, sizeof(ebuf),
             &inv));
 
-    for (offs = 0; offs < sizeof(tests) / sizeof(cbor_failure); offs++) {
+    for (offs = 0; offs < ARRAY_SIZE(tests); offs++) {
         unsigned char buf[32] = {0};
         TEST_ASSERT((strlen(tests[offs].hex)/2) <= sizeof(buf));
 

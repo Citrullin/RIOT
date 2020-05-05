@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2017 Kaspar Schleiser <kaspar@schleiser.de>
+ * Copyright (C) 2017 Inria
+ *               2017 Kaspar Schleiser <kaspar@schleiser.de>
  *               2018 Freie Universität Berlin
  *
  * This file is subject to the terms and conditions of the GNU Lesser
@@ -27,6 +28,10 @@
 #include "event.h"
 #include "clist.h"
 #include "thread.h"
+
+#ifdef MODULE_XTIMER
+#include "xtimer.h"
+#endif
 
 void event_queue_init_detached(event_queue_t *queue)
 {
@@ -108,6 +113,44 @@ event_t *event_wait(event_queue_t *queue)
     result->list_node.next = NULL;
     return result;
 }
+
+#ifdef MODULE_XTIMER
+static event_t *_wait_timeout(event_queue_t *queue, xtimer_t *timer)
+{
+    assert(queue);
+    event_t *result;
+    thread_flags_t flags = 0;
+
+    do {
+        result = event_get(queue);
+        if (result == NULL) {
+            flags = thread_flags_wait_any(THREAD_FLAG_EVENT | THREAD_FLAG_TIMEOUT);
+        }
+    } while ((result == NULL) && (flags & THREAD_FLAG_EVENT));
+
+    if (result) {
+        xtimer_remove(timer);
+    }
+
+    return result;
+}
+
+event_t *event_wait_timeout(event_queue_t *queue, uint32_t timeout)
+{
+    xtimer_t timer;
+
+    xtimer_set_timeout_flag(&timer, timeout);
+    return _wait_timeout(queue, &timer);
+}
+
+event_t *event_wait_timeout64(event_queue_t *queue, uint64_t timeout)
+{
+    xtimer_t timer;
+
+    xtimer_set_timeout_flag64(&timer, timeout);
+    return _wait_timeout(queue, &timer);
+}
+#endif
 
 void event_loop(event_queue_t *queue)
 {

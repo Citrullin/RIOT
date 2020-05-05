@@ -59,8 +59,6 @@ static void buf_fill(uint32_t *buf, int len)
 
 int main(void)
 {
-    xtimer_init();
-
     bloom_init(&bloom, BLOOM_BITS, bf, hashes, BLOOM_HASHF);
 
     printf("Testing Bloom filter.\n\n");

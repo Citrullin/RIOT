@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2016 Kaspar Schleiser <kaspar@schleiser.de>
  *               2013 Freie Universität Berlin
+ *               2017 Inria
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -31,6 +32,7 @@
  * clist_find_before()  | O(n)    | find node return node pointing to node
  * clist_remove()       | O(n)    | remove and return node
  * clist_sort()         | O(NlogN)| sort list (stable)
+ * clist_count()        | O(n)    | count the number of elements in a list
  *
  * clist can be used as a traditional list, a queue (FIFO) and a stack (LIFO) using
  * fast O(1) operations.
@@ -89,7 +91,7 @@
 #include "list.h"
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /**
@@ -250,9 +252,11 @@ static inline clist_node_t *clist_rpop(clist_node_t *list)
  * @returns         predecessor of node if found
  * @returns         NULL if node is not a list member
  */
-static inline clist_node_t *clist_find_before(const clist_node_t *list, const clist_node_t *node)
+static inline clist_node_t *clist_find_before(const clist_node_t *list,
+                                              const clist_node_t *node)
 {
     clist_node_t *pos = list->next;
+
     if (!pos) {
         return NULL;
     }
@@ -278,9 +282,11 @@ static inline clist_node_t *clist_find_before(const clist_node_t *list, const cl
  * @returns         node if found
  * @returns         NULL if node is not a list member
  */
-static inline clist_node_t *clist_find(const clist_node_t *list, const clist_node_t *node)
+static inline clist_node_t *clist_find(const clist_node_t *list,
+                                       const clist_node_t *node)
 {
     clist_node_t *tmp = clist_find_before(list, node);
+
     if (tmp) {
         return tmp->next;
     }
@@ -337,9 +343,12 @@ static inline clist_node_t *clist_remove(clist_node_t *list, clist_node_t *node)
  * @returns         NULL on empty list or full traversal
  * @returns         node that caused @p func(node, arg) to exit non-zero
  */
-static inline clist_node_t *clist_foreach(clist_node_t *list, int(*func)(clist_node_t *, void *), void *arg)
+static inline clist_node_t *clist_foreach(clist_node_t *list, int (*func)(
+                                              clist_node_t *,
+                                              void *), void *arg)
 {
     clist_node_t *node = list->next;
+
     if (node) {
         do {
             node = node->next;
@@ -417,6 +426,28 @@ static inline void clist_sort(clist_node_t *list, clist_cmp_func_t cmp)
     if (list->next) {
         list->next = _clist_sort(list->next->next, cmp);
     }
+}
+
+/**
+ * @brief   Count the number of items in the given list
+ *
+ * @param[in]   list    ptr to the first element of the list
+ *
+ * @return  the number of elements in the given list
+ */
+static inline size_t clist_count(clist_node_t *list)
+{
+    clist_node_t *node = list->next;
+    size_t cnt = 0;
+
+    if (node) {
+        do {
+            node = node->next;
+            ++cnt;
+        } while (node != list->next);
+    }
+
+    return cnt;
 }
 
 #ifdef __cplusplus

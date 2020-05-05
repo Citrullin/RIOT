@@ -42,7 +42,7 @@ static const spi_conf_t spi_config[] = {
     }
 };
 
-#define SPI_NUMOF           (sizeof(spi_config) / sizeof(spi_config[0]))
+#define SPI_NUMOF           ARRAY_SIZE(spi_config)
 /** @} */
 
 /**
@@ -53,6 +53,11 @@ static const spi_conf_t spi_config[] = {
 #define UART_PIN_RX         GPIO_PIN(0, 4)
 #define UART_PIN_TX         GPIO_PIN(0, 5)
 /** @} */
+
+/**
+ * @brief Enable the internal DC/DC converter
+ */
+#define NRF5X_ENABLE_DCDC
 
 #ifdef __cplusplus
 }

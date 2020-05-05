@@ -24,13 +24,17 @@
 #define RMUTEX_H
 
 #include <stdint.h>
+#ifdef __cplusplus
+#include "c11_atomics_compat.hpp"
+#else
 #include <stdatomic.h>
+#endif
 
 #include "mutex.h"
 #include "kernel_types.h"
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /**
@@ -76,6 +80,7 @@ typedef struct rmutex_t {
 static inline void rmutex_init(rmutex_t *rmutex)
 {
     rmutex_t empty_rmutex = RMUTEX_INIT;
+
     *rmutex = empty_rmutex;
 }
 

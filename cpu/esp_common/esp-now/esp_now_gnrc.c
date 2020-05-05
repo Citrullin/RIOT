@@ -21,8 +21,10 @@
 
 #include <sys/uio.h>
 
+#include "cpu_conf.h"
 #include "net/netdev.h"
 #include "net/gnrc.h"
+#include "esp_common_log.h"
 #include "esp_now_params.h"
 #include "esp_now_netdev.h"
 #include "esp_now_gnrc.h"
@@ -141,7 +143,6 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
         pkt = mac_hdr;
         goto err;
     }
-    esp_now_pkt_hdr_t *hdr = (esp_now_pkt_hdr_t*)esp_hdr->data;
 
 #ifdef MODULE_L2FILTER
     if (!l2filter_pass(dev->filter, mac_hdr->data, ESP_NOW_ADDR_LEN)) {
@@ -154,6 +155,8 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
     pkt->type = GNRC_NETTYPE_UNDEF;
 
 #ifdef MODULE_GNRC_SIXLOWPAN
+    esp_now_pkt_hdr_t *hdr = (esp_now_pkt_hdr_t*)esp_hdr->data;
+
     if (hdr->flags & ESP_NOW_PKT_HDR_FLAG_SIXLO) {
         pkt->type = GNRC_NETTYPE_SIXLOWPAN;
     }
@@ -167,7 +170,7 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
         goto err;
     }
 
-    ((gnrc_netif_hdr_t *)netif_hdr->data)->if_pid = netif->pid;
+    gnrc_netif_hdr_set_netif((gnrc_netif_hdr_t *)netif_hdr->data, netif);
 
     uint8_t *mac = mac_hdr->data;
     DEBUG("gnrc_esp_now: received packet from %02x:%02x:%02x:%02x:%02x:%02x of length %u\n",
@@ -185,32 +188,34 @@ err:
 }
 
 static const gnrc_netif_ops_t _esp_now_ops = {
+    .init = gnrc_netif_default_init,
     .send = _send,
     .recv = _recv,
     .get = gnrc_netif_get_from_netdev,
     .set = gnrc_netif_set_from_netdev,
 };
 
-gnrc_netif_t *gnrc_netif_esp_now_create(char *stack, int stacksize, char priority,
-                                        char *name, netdev_t *dev)
+int gnrc_netif_esp_now_create(gnrc_netif_t *netif, char *stack, int stacksize, char priority,
+                              char *name, netdev_t *dev)
 {
-    return gnrc_netif_create(stack, stacksize, priority, name, dev, &_esp_now_ops);
+    return gnrc_netif_create(netif, stack, stacksize, priority, name, dev, &_esp_now_ops);
 }
 
 /* device thread stack */
 static char _esp_now_stack[ESP_NOW_STACKSIZE];
+static gnrc_netif_t _netif;
 
 void auto_init_esp_now(void)
 {
-    LOG_TAG_INFO("esp_now", "initializing ESP-NOW device\n");
+    LOG_TAG_DEBUG("esp_now", "initializing ESP-NOW device\n");
 
     esp_now_netdev_t *esp_now_dev = netdev_esp_now_setup();
     if (!esp_now_dev) {
         LOG_ERROR("[auto_init_netif] error initializing esp_now\n");
     } else {
-        gnrc_netif_esp_now_create(_esp_now_stack, sizeof(_esp_now_stack),
+        gnrc_netif_esp_now_create(&_netif, _esp_now_stack, sizeof(_esp_now_stack),
                                   ESP_NOW_PRIO,
-                                  "net-esp-now",
+                                  "netif-esp-now",
                                   &esp_now_dev->netdev);
     }
 }

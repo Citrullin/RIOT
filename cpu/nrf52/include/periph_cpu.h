@@ -67,6 +67,7 @@ enum {
     NRF52_VDD  = 8,         /**< VDD, not useful if VDD is reference... */
 };
 
+#ifndef DOXYGEN
 /**
  * @brief   Override ADC resolution values
  * @{
@@ -81,7 +82,9 @@ typedef enum {
     ADC_RES_16BIT = 0xf2    /**< not supported by hardware */
 } adc_res_t;
 /** @} */
+#endif /* ndef DOXYGEN */
 
+#ifndef DOXYGEN
 /**
  * @brief   Override I2C speed settings
  * @{
@@ -95,14 +98,15 @@ typedef enum {
     I2C_SPEED_HIGH      = 0xfd,                         /**< not supported */
 } i2c_speed_t;
 /** @} */
+#endif /* ndef DOXYGEN */
 
 /**
  * @brief   I2C (TWI) configuration options
  */
 typedef struct {
     NRF_TWIM_Type *dev;         /**< TWIM hardware device */
-    uint8_t scl;                /**< SCL pin */
-    uint8_t sda;                /**< SDA pin */
+    gpio_t scl;                 /**< SCL pin */
+    gpio_t sda;                 /**< SDA pin */
     i2c_speed_t speed;          /**< Bus speed */
 } i2c_conf_t;
 /** @} */
@@ -154,7 +158,7 @@ typedef enum {
  */
 typedef struct {
     NRF_PWM_Type *dev;                  /**< PWM device descriptor */
-    uint32_t pin[PWM_CHANNELS];         /**< PWM out pins */
+    gpio_t pin[PWM_CHANNELS];           /**< PWM out pins */
 } pwm_conf_t;
 
 #ifdef CPU_MODEL_NRF52840XXAA
@@ -163,10 +167,12 @@ typedef struct {
  */
 typedef struct {
     NRF_UARTE_Type *dev;    /**< UART with EasyDMA device base register address */
-    uint8_t rx_pin;         /**< RX pin */
-    uint8_t tx_pin;         /**< TX pin */
-    uint8_t rts_pin;        /**< RTS pin - set to GPIO_UNDEF when not using HW flow control */
-    uint8_t cts_pin;        /**< CTS pin - set to GPIO_UNDEF when not using HW flow control */
+    gpio_t rx_pin;          /**< RX pin */
+    gpio_t tx_pin;          /**< TX pin */
+#ifdef MODULE_PERIPH_UART_HW_FC
+    gpio_t rts_pin;         /**< RTS pin */
+    gpio_t cts_pin;         /**< CTS pin */
+#endif
     uint8_t irqn;           /**< IRQ channel */
 } uart_conf_t;
 #endif

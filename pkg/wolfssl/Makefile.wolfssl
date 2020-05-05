@@ -1,0 +1,6 @@
+MODULE = wolfssl
+
+NO_AUTO_SRC = 1
+SUBMODULES += 1
+
+include $(RIOTBASE)/Makefile.base

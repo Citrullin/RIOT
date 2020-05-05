@@ -38,6 +38,35 @@ extern "C" {
 #define UART_PIN_TX         GPIO_PIN(0, 3)
 /** @} */
 
+/**
+ * @name    I2C configuration
+ * @{
+ */
+static const i2c_conf_t i2c_config[] = {
+    {
+        /* main I2C bus */
+        .dev = NRF_TWIM0,
+        .scl = 8,
+        .sda = 7,
+        .speed = I2C_SPEED_NORMAL
+    },
+    {
+        /* EXT I2C bus */
+        .dev = NRF_TWIM1,
+        .scl = 15,
+        .sda = 14,
+        .speed = I2C_SPEED_NORMAL
+    },
+};
+
+#define I2C_NUMOF           ARRAY_SIZE(i2c_config)
+/** @} */
+
+/**
+ * @brief Enable the internal DC/DC converter
+ */
+#define NRF5X_ENABLE_DCDC
+
 #ifdef __cplusplus
 }
 #endif

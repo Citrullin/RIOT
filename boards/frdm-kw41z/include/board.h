@@ -20,6 +20,7 @@
 #define BOARD_H
 
 #include "cpu.h"
+#include "board_common.h"
 #include "periph_conf.h"
 
 #ifdef __cplusplus
@@ -84,9 +85,16 @@ extern "C"
 #define XTIMER_WIDTH                (16)
 #define XTIMER_BACKOFF              (5)
 #define XTIMER_ISR_BACKOFF          (5)
-#define XTIMER_OVERHEAD             (4)
 #define XTIMER_HZ                   (32768ul)
 #endif
+/** @} */
+
+/**
+ * @name    ztimer configuration
+ * @{
+ */
+#define CONFIG_ZTIMER_USEC_TYPE     ZTIMER_TYPE_PERIPH_TIMER
+#define CONFIG_ZTIMER_USEC_DEV      (TIMER_PIT_DEV(0))
 /** @} */
 
 /**
@@ -105,11 +113,6 @@ extern "C"
 #define FXOS8700_PARAM_I2C          I2C_DEV(0)
 #define FXOS8700_PARAM_ADDR         0x1F
 /** @} */
-
-/**
- * @brief   Initialize board specific hardware, including clock, LEDs and standard I/O
- */
-void board_init(void);
 
 #ifdef __cplusplus
 }

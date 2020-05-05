@@ -26,6 +26,8 @@
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
+#define RTT_PRESCALER        ((RTT_CLOCK_FREQUENCY / RTT_FREQUENCY) - 1 )
+
 #define RTT_FLAG_RTOFF       ((uint16_t)0x0020)  /**< RTC Operation OFF flag */
 #define RTT_FLAG_RSF         ((uint16_t)0x0008)  /**< Registers Synchronized flag */
 #define RTT_FLAG_OW          ((uint16_t)0x0004)  /**< Overflow flag */
@@ -91,7 +93,7 @@ void rtt_clear_overflow_cb(void)
 
 uint32_t rtt_get_counter(void)
 {
-    /* wait for syncronization */
+    /* wait for synchronization */
     while (!(RTT_DEV->CRL & RTT_FLAG_RSF)) {}
 
     return (((uint32_t)RTT_DEV->CNTH << 16 ) | (uint32_t)(RTT_DEV->CNTL));
@@ -111,7 +113,7 @@ void rtt_set_counter(uint32_t counter)
 
 uint32_t rtt_get_alarm(void)
 {
-    /* wait for syncronization */
+    /* wait for synchronization */
     while (!(RTT_DEV->CRL & RTT_FLAG_RSF)) {}
 
     return (((uint32_t)RTT_DEV->ALRH << 16 ) | (uint32_t)(RTT_DEV->ALRL));

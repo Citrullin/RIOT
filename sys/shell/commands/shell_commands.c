@@ -24,13 +24,18 @@
 #include "shell_commands.h"
 
 extern int _reboot_handler(int argc, char **argv);
+extern int _version_handler(int argc, char **argv);
 
 #ifdef MODULE_CONFIG
 extern int _id_handler(int argc, char **argv);
 #endif
 
-#ifdef MODULE_LPC_COMMON
+#ifdef MODULE_HEAP_CMD
 extern int _heap_handler(int argc, char **argv);
+#endif
+
+#ifdef MODULE_PERIPH_PM
+extern int _pm_handler(int argc, char **argv);
 #endif
 
 #ifdef MODULE_PS
@@ -54,6 +59,10 @@ extern int _saul(int argc, char **argv);
 
 #ifdef MODULE_PERIPH_RTC
 extern int _rtc_handler(int argc, char **argv);
+#endif
+
+#ifdef MODULE_RTT_CMD
+extern int _rtt_handler(int argc, char **argv);
 #endif
 
 #ifdef MODULE_MCI
@@ -90,9 +99,8 @@ extern int _gnrc_netif_send(int argc, char **argv);
 extern int _fib_route_handler(int argc, char **argv);
 #endif
 
-#ifdef MODULE_GNRC_IPV6_NC
-extern int _ipv6_nc_manage(int argc, char **argv);
-extern int _ipv6_nc_routers(int argc, char **argv);
+#ifdef MODULE_GNRC_IPV6_EXT_FRAG_STATS
+extern int _gnrc_ipv6_frag_stats(int argc, char **argv);
 #endif
 
 #ifdef MODULE_GNRC_IPV6_WHITELIST
@@ -112,9 +120,11 @@ extern int _gnrc_rpl(int argc, char **argv);
 #endif
 
 #ifdef MODULE_GNRC_SIXLOWPAN_CTX
-#ifdef MODULE_GNRC_IPV6_NIB_6LBR
 extern int _gnrc_6ctx(int argc, char **argv);
 #endif
+
+#ifdef MODULE_GNRC_SIXLOWPAN_FRAG_STATS
+extern int _gnrc_6lo_frag_stats(int argc, char **argv);
 #endif
 
 #ifdef MODULE_CCN_LITE_UTILS
@@ -141,13 +151,41 @@ extern int _can_handler(int argc, char **argv);
 extern int _cord_ep_handler(int argc, char **argv);
 #endif
 
+#ifdef MODULE_APP_METADATA
+extern int _app_metadata_handler(int argc, char **argv);
+#endif
+
+#ifdef MODULE_I2C_SCAN
+extern int _i2c_scan(int argc, char **argv);
+#endif
+
+#ifdef MODULE_SEMTECH_LORAMAC
+extern int _loramac_handler(int argc, char **argv);
+#endif
+
+#ifdef MODULE_NIMBLE_NETIF
+extern int _nimble_netif_handler(int argc, char **argv);
+#endif
+
+#ifdef MODULE_SUIT_COAP
+extern int _suit_handler(int argc, char **argv);
+#endif
+
+#ifdef MODULE_CRYPTOAUTHLIB
+extern int _cryptoauth(int argc, char **argv);
+#endif
+
 const shell_command_t _shell_command_list[] = {
     {"reboot", "Reboot the node", _reboot_handler},
+    {"version", "Prints current RIOT_VERSION", _version_handler},
 #ifdef MODULE_CONFIG
     {"id", "Gets or sets the node's id.", _id_handler},
 #endif
-#ifdef MODULE_LPC_COMMON
-    {"heap", "Shows the heap state for the LPC2387 on the command shell.", _heap_handler},
+#ifdef MODULE_HEAP_CMD
+    {"heap", "Prints heap statistics.", _heap_handler},
+#endif
+#ifdef MODULE_PERIPH_PM
+    { "pm", "interact with layered PM subsystem", _pm_handler },
 #endif
 #ifdef MODULE_PS
     {"ps", "Prints information about running threads.", _ps_handler},
@@ -180,6 +218,9 @@ const shell_command_t _shell_command_list[] = {
 #ifdef MODULE_PERIPH_RTC
     {"rtc", "control RTC peripheral interface",  _rtc_handler},
 #endif
+#ifdef MODULE_RTT_CMD
+    {"rtt", "control RTC peripheral interface",  _rtt_handler},
+#endif
 #ifdef MODULE_GNRC_IPV6_NIB
     {"nib", "Configure neighbor information base", _gnrc_ipv6_nib},
 #endif
@@ -191,6 +232,9 @@ const shell_command_t _shell_command_list[] = {
 #endif
 #ifdef MODULE_FIB
     {"fibroute", "Manipulate the FIB (info: 'fibroute [add|del]')", _fib_route_handler},
+#endif
+#ifdef MODULE_GNRC_IPV6_EXT_FRAG_STATS
+    {"ip6_frag", "IPv6 fragmentation statistics", _gnrc_ipv6_frag_stats },
 #endif
 #ifdef MODULE_GNRC_IPV6_WHITELIST
     {"whitelist", "whitelists an address for receival ('whitelist [add|del|help]')", _whitelist },
@@ -205,9 +249,10 @@ const shell_command_t _shell_command_list[] = {
     {"rpl", "rpl configuration tool ('rpl help' for more information)", _gnrc_rpl },
 #endif
 #ifdef MODULE_GNRC_SIXLOWPAN_CTX
-#ifdef MODULE_GNRC_IPV6_NIB_6LBR
     {"6ctx", "6LoWPAN context configuration tool", _gnrc_6ctx },
 #endif
+#ifdef MODULE_GNRC_SIXLOWPAN_FRAG_STATS
+    {"6lo_frag", "6LoWPAN fragment statistics", _gnrc_6lo_frag_stats },
 #endif
 #ifdef MODULE_SAUL_REG
     {"saul", "interact with sensors and actuators using SAUL", _saul },
@@ -230,6 +275,24 @@ const shell_command_t _shell_command_list[] = {
 #endif
 #ifdef MODULE_CORD_EP
     {"cord_ep", "Resource directory endpoint commands", _cord_ep_handler },
+#endif
+#ifdef MODULE_APP_METADATA
+    {"app_metadata", "Returns application metadata", _app_metadata_handler },
+#endif
+#ifdef MODULE_I2C_SCAN
+    { "i2c_scan", "Performs an I2C bus scan", _i2c_scan },
+#endif
+#ifdef MODULE_SEMTECH_LORAMAC
+    {"loramac", "Control Semtech loramac stack", _loramac_handler},
+#endif
+#ifdef MODULE_NIMBLE_NETIF
+    { "ble", "Manage BLE connections for NimBLE", _nimble_netif_handler },
+#endif
+#ifdef MODULE_SUIT_COAP
+    { "suit", "Trigger a SUIT firmware update", _suit_handler },
+#endif
+#ifdef MODULE_CRYPTOAUTHLIB
+    { "cryptoauth", "Commands for Microchip CryptoAuth devices", _cryptoauth },
 #endif
     {NULL, NULL, NULL}
 };

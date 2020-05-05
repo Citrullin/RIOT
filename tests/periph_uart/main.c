@@ -28,11 +28,18 @@
 #include "msg.h"
 #include "ringbuffer.h"
 #include "periph/uart.h"
-#include "stdio_uart.h"
 #include "xtimer.h"
 
+#ifdef MODULE_STDIO_UART
+#include "stdio_uart.h"
+#endif
+
+#ifndef SHELL_BUFSIZE
 #define SHELL_BUFSIZE       (128U)
+#endif
+#ifndef UART_BUFSIZE
 #define UART_BUFSIZE        (128U)
+#endif
 
 #define PRINTER_PRIO        (THREAD_PRIORITY_MAIN - 1)
 #define PRINTER_TYPE        (0xabcd)
@@ -56,10 +63,10 @@ static char printer_stack[THREAD_STACKSIZE_MAIN];
 #ifdef MODULE_PERIPH_UART_MODECFG
 static uart_data_bits_t data_bits_lut[] = { UART_DATA_BITS_5, UART_DATA_BITS_6,
                                             UART_DATA_BITS_7, UART_DATA_BITS_8 };
-static int data_bits_lut_len = sizeof(data_bits_lut)/sizeof(data_bits_lut[0]);
+static int data_bits_lut_len = ARRAY_SIZE(data_bits_lut);
 
 static uart_stop_bits_t stop_bits_lut[] = { UART_STOP_BITS_1, UART_STOP_BITS_2 };
-static int stop_bits_lut_len = sizeof(stop_bits_lut)/sizeof(stop_bits_lut[0]);
+static int stop_bits_lut_len = ARRAY_SIZE(stop_bits_lut);
 #endif
 
 static int parse_dev(char *arg)
@@ -279,11 +286,15 @@ int main(void)
      * value given in STDIO_UART_DEV is not a numeral (depends on the CPU
      * implementation), so we rather break the output by printing a
      * non-numerical value instead of breaking the UART device descriptor */
-    sleep_test(STDIO_UART_DEV, STDIO_UART_DEV);
+    if (STDIO_UART_DEV != UART_UNDEF) {
+        sleep_test(STDIO_UART_DEV, STDIO_UART_DEV);
+    }
 
     puts("\nUART INFO:");
     printf("Available devices:               %i\n", UART_NUMOF);
-    printf("UART used for STDIO (the shell): UART_DEV(%i)\n\n", STDIO_UART_DEV);
+    if (STDIO_UART_DEV != UART_UNDEF) {
+        printf("UART used for STDIO (the shell): UART_DEV(%i)\n\n", STDIO_UART_DEV);
+    }
 
     /* initialize ringbuffers */
     for (unsigned i = 0; i < UART_NUMOF; i++) {
@@ -295,7 +306,7 @@ int main(void)
                                 PRINTER_PRIO, 0, printer, NULL, "printer");
 
     /* run the shell */
-    char line_buf[SHELL_DEFAULT_BUFSIZE];
-    shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
+    char line_buf[SHELL_BUFSIZE];
+    shell_run(shell_commands, line_buf, SHELL_BUFSIZE);
     return 0;
 }

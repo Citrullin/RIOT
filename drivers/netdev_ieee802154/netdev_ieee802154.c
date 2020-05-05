@@ -67,8 +67,38 @@ void netdev_ieee802154_reset(netdev_ieee802154_t *dev)
 #endif
 
     /* Initialize PAN ID and call netdev::set to propagate it */
-    dev->pan = IEEE802154_DEFAULT_PANID;
+    dev->pan = CONFIG_IEEE802154_DEFAULT_PANID;
     dev->netdev.driver->set(&dev->netdev, NETOPT_NID, &dev->pan, sizeof(dev->pan));
+}
+
+static inline uint16_t _get_ieee802154_pdu(netdev_ieee802154_t *dev)
+{
+#if defined(MODULE_NETDEV_IEEE802154_MR_OQPSK) || \
+    defined(MODULE_NETDEV_IEEE802154_MR_OFDM)  || \
+    defined(MODULE_NETDEV_IEEE802154_MR_FSK)
+    uint8_t type = IEEE802154_PHY_DISABLED;
+    dev->netdev.driver->get(&dev->netdev, NETOPT_IEEE802154_PHY, &type, sizeof(type));
+#else
+    (void) dev;
+#endif
+
+#ifdef MODULE_NETDEV_IEEE802154_MR_OQPSK
+    if (type == IEEE802154_PHY_MR_OQPSK) {
+        return IEEE802154G_FRAME_LEN_MAX;
+    }
+#endif
+#ifdef MODULE_NETDEV_IEEE802154_MR_OFDM
+    if (type == IEEE802154_PHY_MR_OFDM) {
+        return IEEE802154G_FRAME_LEN_MAX;
+    }
+#endif
+#ifdef MODULE_NETDEV_IEEE802154_MR_FSK
+    if (type == IEEE802154_PHY_MR_FSK) {
+        return IEEE802154G_FRAME_LEN_MAX;
+    }
+#endif
+
+    return IEEE802154_FRAME_LEN_MAX;
 }
 
 int netdev_ieee802154_get(netdev_ieee802154_t *dev, netopt_t opt, void *value,
@@ -152,9 +182,10 @@ int netdev_ieee802154_get(netdev_ieee802154_t *dev, netopt_t opt, void *value,
 #endif
         case NETOPT_MAX_PDU_SIZE:
             assert(max_len >= sizeof(int16_t));
-            *((uint16_t *)value) = (IEEE802154_FRAME_LEN_MAX -
-                                  IEEE802154_MAX_HDR_LEN) -
-                                  IEEE802154_FCS_LEN;
+
+            *((uint16_t *)value) = (_get_ieee802154_pdu(dev)
+                                    - IEEE802154_MAX_HDR_LEN)
+                                    - IEEE802154_FCS_LEN;
             res = sizeof(uint16_t);
             break;
         default:
@@ -251,6 +282,32 @@ int netdev_ieee802154_set(netdev_ieee802154_t *dev, netopt_t opt, const void *va
             break;
     }
     return res;
+}
+
+int netdev_ieee802154_dst_filter(netdev_ieee802154_t *dev, const uint8_t *mhr)
+{
+    uint8_t dst_addr[IEEE802154_LONG_ADDRESS_LEN];
+    le_uint16_t dst_pan;
+    uint8_t pan_bcast[] = IEEE802154_PANID_BCAST;
+
+    int addr_len = ieee802154_get_dst(mhr, dst_addr, &dst_pan);
+
+    /* filter PAN ID */
+    if ((memcmp(pan_bcast, dst_pan.u8, 2) != 0) &&
+        (memcmp(&dev->pan, dst_pan.u8, 2) != 0)) {
+        return 1;
+    }
+
+    /* check destination address */
+    if (((addr_len == IEEE802154_SHORT_ADDRESS_LEN) &&
+          (memcmp(dev->short_addr, dst_addr, addr_len) == 0 ||
+           memcmp(ieee802154_addr_bcast, dst_addr, addr_len) == 0)) ||
+        ((addr_len == IEEE802154_LONG_ADDRESS_LEN) &&
+          (memcmp(dev->long_addr, dst_addr, addr_len) == 0))) {
+        return 0;
+    }
+
+    return 1;
 }
 
 /** @} */

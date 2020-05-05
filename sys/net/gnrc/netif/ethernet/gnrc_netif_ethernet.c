@@ -33,19 +33,26 @@
 
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt);
 static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif);
+#ifdef MODULE_GNRC_SIXLOENC
+static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt);
+#else
+#define _set    gnrc_netif_set_from_netdev
+#endif /* MODULE_GNRC_SIXLOENC */
+
+static char addr_str[ETHERNET_ADDR_LEN * 3];
 
 static const gnrc_netif_ops_t ethernet_ops = {
+    .init = gnrc_netif_default_init,
     .send = _send,
     .recv = _recv,
     .get = gnrc_netif_get_from_netdev,
-    .set = gnrc_netif_set_from_netdev,
+    .set = _set,
 };
 
-gnrc_netif_t *gnrc_netif_ethernet_create(char *stack, int stacksize,
-                                         char priority, char *name,
-                                         netdev_t *dev)
+int gnrc_netif_ethernet_create(gnrc_netif_t *netif, char *stack, int stacksize,
+                               char priority, char *name, netdev_t *dev)
 {
-    return gnrc_netif_create(stack, stacksize, priority, name, dev,
+    return gnrc_netif_create(netif, stack, stacksize, priority, name, dev,
                              &ethernet_ops);
 }
 
@@ -196,6 +203,12 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
             gnrc_pktbuf_realloc_data(pkt, nread);
         }
 
+        DEBUG("gnrc_netif_ethernet: received packet from %s of length %d\n",
+              gnrc_netif_addr_to_str(pkt->data, ETHERNET_ADDR_LEN, addr_str),
+              nread);
+#if defined(MODULE_OD) && ENABLE_DEBUG
+        od_hex_dump(pkt->data, nread, OD_WIDTH_DEFAULT);
+#endif
         /* mark ethernet header */
         gnrc_pktsnip_t *eth_hdr = gnrc_pktbuf_mark(pkt, sizeof(ethernet_hdr_t), GNRC_NETTYPE_UNDEF);
         if (!eth_hdr) {
@@ -230,15 +243,7 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
         gnrc_netif_hdr_init(netif_hdr->data, ETHERNET_ADDR_LEN, ETHERNET_ADDR_LEN);
         gnrc_netif_hdr_set_src_addr(netif_hdr->data, hdr->src, ETHERNET_ADDR_LEN);
         gnrc_netif_hdr_set_dst_addr(netif_hdr->data, hdr->dst, ETHERNET_ADDR_LEN);
-        ((gnrc_netif_hdr_t *)netif_hdr->data)->if_pid = netif->pid;
-
-        DEBUG("gnrc_netif_ethernet: received packet from %02x:%02x:%02x:%02x:%02x:%02x "
-              "of length %d\n",
-              hdr->src[0], hdr->src[1], hdr->src[2], hdr->src[3], hdr->src[4],
-              hdr->src[5], nread);
-#if defined(MODULE_OD) && ENABLE_DEBUG
-        od_hex_dump(hdr, nread, OD_WIDTH_DEFAULT);
-#endif
+        gnrc_netif_hdr_set_netif(netif_hdr->data, netif);
 
         gnrc_pktbuf_remove_snip(pkt, eth_hdr);
         LL_APPEND(pkt, netif_hdr);
@@ -252,4 +257,22 @@ safe_out:
     return NULL;
 }
 
+#ifdef MODULE_GNRC_SIXLOENC
+static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
+{
+    if (opt->opt == NETOPT_6LO) {
+        assert(opt->data_len == sizeof(netopt_enable_t));
+        if (*((netopt_enable_t *)opt->data) == NETOPT_ENABLE) {
+            netif->flags |= (GNRC_NETIF_FLAGS_6LO | GNRC_NETIF_FLAGS_6LO_HC |
+                             GNRC_NETIF_FLAGS_6LN);
+        }
+        else {
+            netif->flags &= ~(GNRC_NETIF_FLAGS_6LO | GNRC_NETIF_FLAGS_6LO_HC |
+                              GNRC_NETIF_FLAGS_6LN);
+        }
+        return sizeof(netopt_enable_t);
+    }
+    return gnrc_netif_set_from_netdev(netif, opt);
+}
+#endif /* MODULE_GNRC_SIXLOENC */
 /** @} */

@@ -39,6 +39,7 @@
 #include "board.h"
 #include "cpu.h"
 #include "periph/timer.h"
+#include "test_utils/expect.h"
 
 #include "print_results.h"
 #include "spin_random.h"
@@ -374,14 +375,10 @@ static void run_test(test_ctx_t *ctx, uint32_t interval, unsigned int variant)
     interval += TEST_MIN;
     unsigned int interval_ref = TIM_TEST_TO_REF(interval);
     xtimer_t xt = {
-        .target = 0,
-        .long_target = 0,
         .callback = cb,
         .arg = ctx,
     };
     xtimer_t xt_parallel = {
-        .target = 0,
-        .long_target = 0,
         .callback = nop,
         .arg = NULL,
     };
@@ -617,10 +614,10 @@ static void estimate_cpu_overhead(void)
 int main(void)
 {
     print_str("\nStatistical benchmark for timers\n");
-    for (unsigned int k = 0; k < (sizeof(ref_states) / sizeof(ref_states[0])); ++k) {
+    for (unsigned int k = 0; k < ARRAY_SIZE(ref_states); ++k) {
         matstat_clear(&ref_states[k]);
     }
-    for (unsigned int k = 0; k < (sizeof(int_states) / sizeof(int_states[0])); ++k) {
+    for (unsigned int k = 0; k < ARRAY_SIZE(int_states); ++k) {
         matstat_clear(&int_states[k]);
     }
     /* print test overview */
@@ -661,7 +658,7 @@ int main(void)
     print_u32_dec(log2test);
     print("\n", 1);
     print_str("state vector elements per variant = ");
-    print_u32_dec(sizeof(ref_states) / sizeof(ref_states[0]) / TEST_VARIANT_NUMOF);
+    print_u32_dec(ARRAY_SIZE(ref_states) / TEST_VARIANT_NUMOF);
     print("\n", 1);
     print_str("number of variants = ");
     print_u32_dec(TEST_VARIANT_NUMOF);
@@ -672,7 +669,7 @@ int main(void)
     print_str("state vector total memory usage = ");
     print_u32_dec(sizeof(ref_states));
     print_str(" bytes\n");
-    assert(log2test < TEST_LOG2NUM);
+    expect(log2test < TEST_LOG2NUM);
     print_str("TIM_TEST_DEV = ");
     print_u32_dec(TIM_TEST_DEV);
     print_str(", TIM_TEST_FREQ = ");
@@ -714,7 +711,7 @@ int main(void)
     if (res < 0) {
         print_str("Error ");
         print_s32_dec(res);
-        print_str(" intializing reference timer\n");
+        print_str(" initializing reference timer\n");
         return res;
     }
     random_init(seed);
@@ -724,7 +721,7 @@ int main(void)
     if (res < 0) {
         print_str("Error ");
         print_s32_dec(res);
-        print_str(" intializing timer under test\n");
+        print_str(" initializing timer under test\n");
         return res;
     }
 #endif

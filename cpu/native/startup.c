@@ -41,9 +41,11 @@
 
 #include "board_internal.h"
 #include "native_internal.h"
+#include "stdio_base.h"
 #include "tty_uart.h"
 
 #include "periph/init.h"
+#include "periph/pm.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"
@@ -76,11 +78,17 @@ netdev_tap_params_t netdev_tap_params[NETDEV_TAP_MAX];
 #ifdef MODULE_CAN_LINUX
 #include "candev_linux.h"
 #endif
-
+#ifdef MODULE_PERIPH_SPIDEV_LINUX
+#include "spidev_linux.h"
+#endif
 #ifdef MODULE_SOCKET_ZEP
 #include "socket_zep_params.h"
 
 socket_zep_params_t socket_zep_params[SOCKET_ZEP_MAX];
+#endif
+#ifdef MODULE_PERIPH_EEPROM
+#include "eeprom_native.h"
+extern char eeprom_file[EEPROM_FILEPATH_MAX_LEN];
 #endif
 
 static const char short_opts[] = ":hi:s:deEoc:"
@@ -92,6 +100,9 @@ static const char short_opts[] = ":hi:s:deEoc:"
 #endif
 #ifdef MODULE_SOCKET_ZEP
     "z:"
+#endif
+#ifdef MODULE_PERIPH_SPIDEV_LINUX
+    "p:"
 #endif
     "";
 
@@ -112,6 +123,12 @@ static const struct option long_opts[] = {
 #endif
 #ifdef MODULE_SOCKET_ZEP
     { "zep", required_argument, NULL, 'z' },
+#endif
+#ifdef MODULE_PERIPH_SPIDEV_LINUX
+    { "spi", required_argument, NULL, 'p' },
+#endif
+#ifdef MODULE_PERIPH_EEPROM
+    { "eeprom", required_argument, NULL, 'M' },
 #endif
     { NULL, 0, NULL, '\0' },
 };
@@ -251,6 +268,9 @@ void usage_exit(int status)
         real_printf(" -z <laddr>:<lport>,<raddr>:<rport>\n");
     }
 #endif
+#ifdef MODULE_PERIPH_SPIDEV_LINUX
+    real_printf(" [-p <b>:<d>:<spidev>]\n");
+#endif
 
     real_printf(" help: %s -h\n\n", _progname);
 
@@ -292,6 +312,21 @@ void usage_exit(int status)
 "    -n <ifnum>:<ifname>, --can <ifnum>:<ifname>\n"
 "        specify CAN interface <ifname> to use for CAN device #<ifnum>\n"
 "        max number of CAN device: %d\n", CAN_DLL_NUMOF);
+#endif
+#ifdef MODULE_PERIPH_SPIDEV_LINUX
+    real_printf(
+"    -p <b>:<d>:<spidev>, --spi=<b>:<d>:<spidev>\n"
+"        specify Linux SPI device to use for CS line d on bus b (in RIOT)\n"
+"        Example: --spi=0:1:/dev/spidev0.0 will assign the file spidev0.0 to\n"
+"                 SPI_DEV(0) and SPI_HWCS(1).\n"
+"        Supports up to %d buses with %d CS lines each.\n", SPI_NUMOF, SPI_MAXCS
+    );
+#endif
+#ifdef MODULE_PERIPH_EEPROM
+    real_printf(
+"    -M <eeprom> , --eeprom=<eeprom>\n"
+"        Specify the file path where the EEPROM content is stored\n"
+"        Example: --eeprom=/tmp/riot_native.eeprom\n");
 #endif
     real_exit(status);
 }
@@ -370,9 +405,16 @@ extern init_func_t __init_array_start;
 extern init_func_t __init_array_end;
 #endif
 
+static void _reset_handler(void)
+{
+    pm_reboot();
+}
+
 __attribute__((constructor)) static void startup(int argc, char **argv, char **envp)
 {
     _native_init_syscalls();
+    /* initialize stdio as early as possible */
+    stdio_init();
 
     _native_argv = argv;
     _progname = argv[0];
@@ -456,6 +498,28 @@ __attribute__((constructor)) static void startup(int argc, char **argv, char **e
                 _zep_params_setup(optarg, zeps++);
                 break;
 #endif
+#ifdef MODULE_PERIPH_SPIDEV_LINUX
+            case 'p': {
+                    long bus = strtol(optarg, &optarg, 10);
+                    if (*optarg != ':') {
+                        usage_exit(EXIT_FAILURE);
+                    }
+                    long cs = strtol(++optarg, &optarg, 10);
+                    if (*optarg != ':') {
+                        usage_exit(EXIT_FAILURE);
+                    }
+                    if (spidev_linux_setup(bus, cs, ++optarg) < 0) {
+                        usage_exit(EXIT_FAILURE);
+                    }
+                }
+                break;
+#endif
+#ifdef MODULE_PERIPH_EEPROM
+            case 'M': {
+                strncpy(eeprom_file, optarg, EEPROM_FILEPATH_MAX_LEN);
+                break;
+            }
+#endif
             default:
                 usage_exit(EXIT_FAILURE);
                 break;
@@ -505,7 +569,7 @@ __attribute__((constructor)) static void startup(int argc, char **argv, char **e
      * power off command.
      * We need all C++ global constructors and other initializers to run before
      * we enter the normal application code, which may depend on global objects
-     * having been initalized properly. Therefore, we iterate through the
+     * having been initialized properly. Therefore, we iterate through the
      * remainder of the init_array and call any constructors which have been
      * placed after startup in the initialization order.
      */
@@ -538,8 +602,14 @@ __attribute__((constructor)) static void startup(int argc, char **argv, char **e
     }
 #endif
 
+#ifdef MODULE_PERIPH_EEPROM
+    eeprom_native_read();
+#endif
+
     periph_init();
     board_init();
+
+    register_interrupt(SIGUSR1, _reset_handler);
 
     puts("RIOT native hardware initialization complete.\n");
     irq_enable();

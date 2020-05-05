@@ -7,12 +7,11 @@
 # directory for more details.
 
 import sys
-from testrunner import run
+from testrunner import run_check_unittests
 
-
-def testfunc(child):
-    child.expect('OK \(\d+ tests\)')
+# It takes ~11s on nucleo-l152re, so add some margin
+TIMEOUT = 15
 
 
 if __name__ == "__main__":
-    sys.exit(run(testfunc))
+    sys.exit(run_check_unittests(timeout=TIMEOUT))

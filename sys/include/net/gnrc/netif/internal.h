@@ -21,7 +21,10 @@
 #ifndef NET_GNRC_NETIF_INTERNAL_H
 #define NET_GNRC_NETIF_INTERNAL_H
 
+#include <kernel_defines.h>
+
 #include "net/gnrc/netif.h"
+#include "net/l2util.h"
 #include "net/netopt.h"
 
 #ifdef MODULE_GNRC_IPV6_NIB
@@ -297,14 +300,15 @@ int gnrc_netif_ipv6_group_idx(gnrc_netif_t *netif,
  * @return  true, if the interface represents a router
  * @return  false, if the interface does not represent a router
  */
-#if defined(MODULE_GNRC_IPV6_ROUTER) || defined(DOXYGEN)
 static inline bool gnrc_netif_is_rtr(const gnrc_netif_t *netif)
 {
-    return (netif->flags & GNRC_NETIF_FLAGS_IPV6_FORWARDING);
+    if (IS_USED(MODULE_GNRC_IPV6_ROUTER)) {
+        return (netif->flags & GNRC_NETIF_FLAGS_IPV6_FORWARDING);
+    }
+    else {
+        return false;
+    }
 }
-#else
-#define gnrc_netif_is_rtr(netif)                (false)
-#endif
 
 /**
  * @brief   Checks if the interface is allowed to send out router advertisements
@@ -319,24 +323,65 @@ static inline bool gnrc_netif_is_rtr(const gnrc_netif_t *netif)
  * @return  false, if the interface is not allowed to send out router
  *          advertisements
  */
-#if defined(MODULE_GNRC_IPV6_ROUTER) || defined(DOXYGEN)
 static inline bool gnrc_netif_is_rtr_adv(const gnrc_netif_t *netif)
 {
-    return (netif->flags & GNRC_NETIF_FLAGS_IPV6_RTR_ADV);
+    if (IS_USED(MODULE_GNRC_IPV6_ROUTER)) {
+        return (netif->flags & GNRC_NETIF_FLAGS_IPV6_RTR_ADV);
+    }
+    else {
+        return false;
+    }
 }
-#else
-#define gnrc_netif_is_rtr_adv(netif)            (false)
-#endif
+
+/**
+ * @brief   Checks if the device type associated to a @ref gnrc_netif_t
+ *          requires 6Lo to run
+ *
+ * @param[in] netif the network interface
+ *
+ * @return true if the device requires 6Lo
+ * @return false otherwise
+ */
+bool gnrc_netif_dev_is_6lo(const gnrc_netif_t *netif);
+
+/**
+ * @brief   Checks if the interface uses a protocol that requires 6Lo to run
+ *
+ * @attention   Requires prior locking
+ * @note        Assumed to be true, when @ref gnrc_netif_highlander() return true and
+ *              @ref net_gnrc_sixlowpan module is included. When the
+ *              @ref net_gnrc_sixlowpan module is not included, it is assumed
+ *              to be false.
+ *              Since `gnrc_sixloenc` makes the interface's 6Lo capabilities
+ *              configurable for an Ethernet interface, this does not apply,
+ *              when that module is compiled in.
+ *
+ * @param[in] netif the network interface
+ *
+ * @return  true, if the interface represents a 6LN
+ * @return  false, if the interface does not represent a 6LN
+ */
+static inline bool gnrc_netif_is_6lo(const gnrc_netif_t *netif)
+{
+    if ((!gnrc_netif_highlander() &&
+       IS_USED(MODULE_GNRC_SIXLOWPAN)) || \
+       IS_USED(MODULE_GNRC_SIXLOENC)) {
+        return gnrc_netif_dev_is_6lo(netif);
+    }
+    else if (gnrc_netif_highlander() && IS_USED(MODULE_GNRC_SIXLOWPAN)) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
 
 /**
  * @brief   Checks if the interface represents a 6Lo node (6LN) according to
  *          RFC 6775
  *
  * @attention   Requires prior locking
- * @note        Assumed to be true, when @ref GNRC_NETIF_NUMOF == 1 and
- *              @ref net_gnrc_sixlowpan module is included (and
- *              @ref GNRC_IPV6_NIB_CONF_6LN is not 0, otherwise assumed to be
- *              false).
+ * @note        Assumed to be false, when @ref CONFIG_GNRC_IPV6_NIB_6LN is 0.
  *
  * @param[in] netif the network interface
  *
@@ -345,20 +390,22 @@ static inline bool gnrc_netif_is_rtr_adv(const gnrc_netif_t *netif)
  * @return  true, if the interface represents a 6LN
  * @return  false, if the interface does not represent a 6LN
  */
-#if (GNRC_NETIF_NUMOF > 1) || !defined(MODULE_GNRC_SIXLOWPAN) || defined(DOXYGEN)
-bool gnrc_netif_is_6ln(const gnrc_netif_t *netif);
-#elif GNRC_IPV6_NIB_CONF_6LN
-#define gnrc_netif_is_6ln(netif)                (true)
-#else
-#define gnrc_netif_is_6ln(netif)                (false)
-#endif
+static inline bool gnrc_netif_is_6ln(const gnrc_netif_t *netif)
+{
+    if (IS_ACTIVE(CONFIG_GNRC_IPV6_NIB_6LN)) {
+        return (netif->flags & GNRC_NETIF_FLAGS_6LN);
+    }
+    else {
+        return false;
+    }
+}
 
 /**
  * @brief   Checks if the interface represents a 6Lo router (6LR) according to
  *          RFC 6775
  *
  * @attention   Requires prior locking
- * @note        Assumed to be false, when @ref GNRC_IPV6_NIB_CONF_6LR == 0
+ * @note        Assumed to be false, when @ref CONFIG_GNRC_IPV6_NIB_6LR == 0
  *
  * @param[in] netif the network interface
  *
@@ -367,25 +414,26 @@ bool gnrc_netif_is_6ln(const gnrc_netif_t *netif);
  * @return  true, if the interface represents a 6LR
  * @return  false, if the interface does not represent a 6LR
  */
-#if (GNRC_IPV6_NIB_CONF_6LR && \
-     /* if flag checkers even evaluate, otherwise just assume their result */ \
-     (defined(MODULE_GNRC_IPV6_ROUTER) || \
-      (GNRC_NETIF_NUMOF > 1) || !defined(MODULE_GNRC_SIXLOWPAN))) || \
-    defined(DOXYGEN)
 static inline bool gnrc_netif_is_6lr(const gnrc_netif_t *netif)
 {
-    return gnrc_netif_is_rtr(netif) && gnrc_netif_is_6ln(netif);
+     /* if flag checkers even evaluate, otherwise just assume their result */
+    if (IS_ACTIVE(CONFIG_GNRC_IPV6_NIB_6LR) &&
+            (IS_USED(MODULE_GNRC_IPV6_ROUTER) ||
+            (!gnrc_netif_highlander()) ||
+            !IS_USED(MODULE_GNRC_SIXLOWPAN))) {
+        return gnrc_netif_is_rtr(netif) && gnrc_netif_is_6ln(netif);
+    }
+    else {
+        return false;
+    }
 }
-#else
-#define gnrc_netif_is_6lr(netif)                (false)
-#endif
 
 /**
  * @brief   Checks if the interface represents a 6Lo border router (6LBR)
  *          according to RFC 6775
  *
  * @attention   Requires prior locking
- * @note        Assumed to be false, when @ref GNRC_IPV6_NIB_CONF_6LBR == 0.
+ * @note        Assumed to be false, when @ref CONFIG_GNRC_IPV6_NIB_6LBR == 0.
  *
  * @param[in] netif the network interface
  *
@@ -394,15 +442,16 @@ static inline bool gnrc_netif_is_6lr(const gnrc_netif_t *netif)
  * @return  true, if the interface represents a 6LBR
  * @return  false, if the interface does not represent a 6LBR
  */
-#if GNRC_IPV6_NIB_CONF_6LBR
 static inline bool gnrc_netif_is_6lbr(const gnrc_netif_t *netif)
 {
-    return (netif->flags & GNRC_NETIF_FLAGS_6LO_ABR) &&
-           gnrc_netif_is_6lr(netif);
+    if (IS_ACTIVE(CONFIG_GNRC_IPV6_NIB_6LBR)) {
+        return (netif->flags & GNRC_NETIF_FLAGS_6LO_ABR) &&
+               gnrc_netif_is_6lr(netif);
+    }
+    else {
+        return false;
+    }
 }
-#else
-#define gnrc_netif_is_6lbr(netif)               (false)
-#endif
 
 /**
  * @name    Device type based function
@@ -479,6 +528,14 @@ static inline int gnrc_netif_get_eui64(gnrc_netif_t *netif, eui64_t *eui64)
     return -ENOTSUP;
 }
 
+/**
+ * @brief   Initializes an interface as 6LN according to RFC 6775 and according
+ *          to its gnrc_netif_t::device_type
+ *
+ * @param[in] netif The network interface to initialize as 6LN
+ */
+void gnrc_netif_init_6ln(gnrc_netif_t *netif);
+
 #if defined(MODULE_GNRC_IPV6) || defined(DOXYGEN)
 /**
  * @brief   Initialize IPv6 MTU and other packet length related members of
@@ -539,8 +596,12 @@ int gnrc_netif_ipv6_iid_from_addr(const gnrc_netif_t *netif,
  * @return  `-ENOTSUP`, when gnrc_netif_t::device_type of @p netif does not
  *          support reverse IID conversion.
  */
-int gnrc_netif_ipv6_iid_to_addr(const gnrc_netif_t *netif, const eui64_t *iid,
-                                uint8_t *addr);
+static inline int gnrc_netif_ipv6_iid_to_addr(const gnrc_netif_t *netif,
+                                              const eui64_t *iid, uint8_t *addr)
+{
+    assert(netif->flags & GNRC_NETIF_FLAGS_HAS_L2ADDR);
+    return l2util_ipv6_iid_to_addr(netif->device_type, iid, addr);
+}
 
 /**
  * @brief   Converts an interface IID of an interface's hardware address
@@ -602,8 +663,12 @@ static inline int gnrc_netif_ipv6_get_iid(gnrc_netif_t *netif, eui64_t *iid)
  * @return  `-EINVAL` if `opt->len` was an invalid value for the given
  *          gnrc_netif_t::device_type of @p netif.
  */
-int gnrc_netif_ndp_addr_len_from_l2ao(gnrc_netif_t *netif,
-                                      const ndp_opt_t *opt);
+static inline int gnrc_netif_ndp_addr_len_from_l2ao(gnrc_netif_t *netif,
+                                                    const ndp_opt_t *opt)
+{
+    assert(netif->flags & GNRC_NETIF_FLAGS_HAS_L2ADDR);
+    return l2util_ndp_addr_len_from_l2ao(netif->device_type, opt);
+}
 #else   /* defined(MODULE_GNRC_IPV6) || defined(DOXYGEN) */
 #define gnrc_netif_ipv6_init_mtu(netif)                             (void)netif
 #define gnrc_netif_ipv6_iid_from_addr(netif, addr, addr_len, iid)   (-ENOTSUP)

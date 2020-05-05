@@ -38,7 +38,11 @@
 
 static mutex_t _mutex = MUTEX_INIT;
 
-#ifdef TEST_SUITES
+#ifdef MODULE_FUZZING
+extern gnrc_pktsnip_t *gnrc_pktbuf_fuzzptr;
+#endif
+
+#if defined(TEST_SUITES) || defined(MODULE_FUZZING)
 static unsigned mallocs;
 
 static inline void *_malloc(size_t size)
@@ -50,6 +54,11 @@ static inline void *_malloc(size_t size)
 static inline void _free(void *ptr)
 {
     if (ptr != NULL) {
+#if defined(MODULE_FUZZING) && !defined(MODULE_GNRC_SOCK)
+        if (ptr == gnrc_pktbuf_fuzzptr) {
+           exit(EXIT_SUCCESS);
+        }
+#endif
         mallocs--;
         free(ptr);
     }
@@ -232,7 +241,7 @@ void gnrc_pktbuf_release_error(gnrc_pktsnip_t *pkt, uint32_t err)
 gnrc_pktsnip_t *gnrc_pktbuf_start_write(gnrc_pktsnip_t *pkt)
 {
     mutex_lock(&_mutex);
-    if ((pkt == NULL) || (pkt->size == 0)) {
+    if (pkt == NULL) {
         mutex_unlock(&_mutex);
         return NULL;
     }
@@ -293,56 +302,6 @@ static gnrc_pktsnip_t *_create_snip(gnrc_pktsnip_t *next, const void *data, size
         memcpy(_data, data, size);
     }
     return pkt;
-}
-
-gnrc_pktsnip_t *gnrc_pktbuf_duplicate_upto(gnrc_pktsnip_t *pkt, gnrc_nettype_t type)
-{
-    mutex_lock(&_mutex);
-
-    bool is_shared = pkt->users > 1;
-    size_t size = gnrc_pkt_len_upto(pkt, type);
-
-    DEBUG("ipv6_ext: duplicating %d octets\n", (int) size);
-
-    gnrc_pktsnip_t *tmp;
-    gnrc_pktsnip_t *target = gnrc_pktsnip_search_type(pkt, type);
-    gnrc_pktsnip_t *next = (target == NULL) ? NULL : target->next;
-    gnrc_pktsnip_t *new = _create_snip(next, NULL, size, type);
-
-    if (new == NULL) {
-        mutex_unlock(&_mutex);
-
-        return NULL;
-    }
-
-    /* copy payloads */
-    for (tmp = pkt; tmp != NULL; tmp = tmp->next) {
-        uint8_t *dest = ((uint8_t *)new->data) + (size - tmp->size);
-
-        memcpy(dest, tmp->data, tmp->size);
-
-        size -= tmp->size;
-
-        if (tmp->type == type) {
-            break;
-        }
-    }
-
-    /* decrements reference counters */
-
-    if (target != NULL) {
-        target->next = NULL;
-    }
-
-    _release_error_locked(pkt, GNRC_NETERR_SUCCESS);
-
-    if (is_shared && (target != NULL)) {
-        target->next = next;
-    }
-
-    mutex_unlock(&_mutex);
-
-    return new;
 }
 
 /** @} */

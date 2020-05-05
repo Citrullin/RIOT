@@ -36,6 +36,9 @@
 #ifdef MODULE_GNRC_IPV6_NIB
 #include "net/gnrc/ipv6/nib/nc.h"
 #endif
+#ifdef MODULE_SOCK_DNS
+#include "net/sock/dns.h"
+#endif
 #include "net/icmpv6.h"
 #include "net/ipv6.h"
 #include "timex.h"
@@ -67,7 +70,7 @@ typedef struct {
     BITFIELD(cktab, CKTAB_SIZE);
     uint32_t timeout;
     uint32_t interval;
-    kernel_pid_t iface;
+    gnrc_netif_t *netif;
     uint16_t id;
     uint8_t hoplimit;
     uint8_t pattern;
@@ -77,7 +80,7 @@ static void _usage(char *cmdname);
 static int _configure(int argc, char **argv, _ping_data_t *data);
 static void _pinger(_ping_data_t *data);
 static void _print_reply(_ping_data_t *data, gnrc_pktsnip_t *icmpv6,
-                         ipv6_addr_t *from, unsigned hoplimit);
+                         ipv6_addr_t *from, unsigned hoplimit, gnrc_netif_hdr_t *netif_hdr);
 static void _handle_reply(_ping_data_t *data, gnrc_pktsnip_t *pkt);
 static int _finish(_ping_data_t *data);
 
@@ -162,6 +165,16 @@ static void _usage(char *cmdname)
               "of any responses, otherwise wait for two RTTs");
 }
 
+/* get the next netif, returns true if there are more */
+static bool _netif_get(gnrc_netif_t **current_netif)
+{
+    gnrc_netif_t *netif = *current_netif;
+    netif = gnrc_netif_iter(netif);
+
+    *current_netif = netif;
+    return !gnrc_netif_highlander() && gnrc_netif_iter(netif);
+}
+
 static int _configure(int argc, char **argv, _ping_data_t *data)
 {
     char *cmdname = argv[0];
@@ -171,21 +184,25 @@ static int _configure(int argc, char **argv, _ping_data_t *data)
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
         if (arg[0] != '-') {
+
             data->hostname = arg;
 #ifdef MODULE_SOCK_DNS
-            if (sock_dns_query(data->hostname, &data->host, AF_INET6) == 0) {
+            if (strchr(data->hostname, ':') == NULL &&
+                sock_dns_query(data->hostname, &data->host, AF_INET6) > 0) {
+                res = 0;
                 continue;
             }
 #endif
-            data->iface = ipv6_addr_split_iface(data->hostname);
-            if (data->iface < KERNEL_PID_UNDEF) {
-#if GNRC_NETIF_NUMOF == 1
-                gnrc_netif_t *netif = gnrc_netif_iter(NULL);
-                if (netif != NULL) {
-                    data->iface = netif->pid;
-                }
-#endif
+            char *iface = ipv6_addr_split_iface(data->hostname);
+            if (iface) {
+                data->netif = gnrc_netif_get_by_pid(atoi(iface));
             }
+            /* preliminary select the first interface */
+            else if (_netif_get(&data->netif)) {
+                /* don't take it if there is more than one interface */
+                data->netif = NULL;
+            }
+
             if (ipv6_addr_from_str(&data->host, data->hostname) == NULL) {
                 break;
             }
@@ -240,8 +257,9 @@ static int _configure(int argc, char **argv, _ping_data_t *data)
     if (res != 0) {
         _usage(cmdname);
     }
+    data->id ^= (xtimer_now_usec() & UINT16_MAX);
 #ifdef MODULE_LUID
-    luid_custom(&data->id, sizeof(data->id), DEFAULT_ID);
+    luid_custom(&data->id, sizeof(data->id), data->id);
 #endif
     return res;
 }
@@ -295,16 +313,13 @@ static void _pinger(_ping_data_t *data)
     ipv6 = pkt->data;
     /* if data->hoplimit is unset (i.e. 0) gnrc_ipv6 will select hop limit */
     ipv6->hl = data->hoplimit;
-    if (data->iface > KERNEL_PID_UNDEF) {
-        gnrc_netif_hdr_t *netif;
-
+    if (data->netif != NULL) {
         tmp = gnrc_netif_hdr_build(NULL, 0, NULL, 0);
         if (tmp == NULL) {
             puts("error: packet buffer full");
             goto error_exit;
         }
-        netif = tmp->data;
-        netif->if_pid = data->iface;
+        gnrc_netif_hdr_set_netif(tmp->data, data->netif);
         LL_PREPEND(pkt, tmp);
     }
     if (data->datalen >= sizeof(uint32_t)) {
@@ -322,9 +337,13 @@ error_exit:
 }
 
 static void _print_reply(_ping_data_t *data, gnrc_pktsnip_t *icmpv6,
-                         ipv6_addr_t *from, unsigned hoplimit)
+                         ipv6_addr_t *from, unsigned hoplimit,
+                         gnrc_netif_hdr_t *netif_hdr)
 {
     icmpv6_echo_t *icmpv6_hdr = icmpv6->data;
+
+    kernel_pid_t if_pid = netif_hdr ? netif_hdr->if_pid : KERNEL_PID_UNDEF;
+    int16_t rssi = netif_hdr ? netif_hdr->rssi : 0;
 
     /* discard if too short */
     if (icmpv6->size < (data->datalen + sizeof(icmpv6_echo_t))) {
@@ -338,6 +357,10 @@ static void _print_reply(_ping_data_t *data, gnrc_pktsnip_t *icmpv6,
 
         /* not our ping */
         if (byteorder_ntohs(icmpv6_hdr->id) != data->id) {
+            return;
+        }
+        if (!ipv6_addr_is_multicast(&data->host) &&
+            !ipv6_addr_equal(from, &data->host)) {
             return;
         }
         recv_seq = byteorder_ntohs(icmpv6_hdr->seq);
@@ -360,8 +383,20 @@ static void _print_reply(_ping_data_t *data, gnrc_pktsnip_t *icmpv6,
             data->num_recv++;
             dupmsg += 7;
         }
-        printf("%u bytes from %s: icmp_seq=%u ttl=%u", (unsigned)icmpv6->size,
-               from_str, recv_seq, hoplimit);
+        if (gnrc_netif_highlander() || (if_pid == KERNEL_PID_UNDEF) ||
+            !ipv6_addr_is_link_local(from)) {
+            printf("%u bytes from %s: icmp_seq=%u ttl=%u",
+                   (unsigned)icmpv6->size,
+                   from_str, recv_seq, hoplimit);
+        } else {
+            printf("%u bytes from %s%%%u: icmp_seq=%u ttl=%u",
+                   (unsigned)icmpv6->size,
+                   from_str, if_pid, recv_seq, hoplimit);
+
+        }
+        if (rssi) {
+            printf(" rssi=%"PRId16" dBm", rssi);
+        }
         if (data->datalen >= sizeof(uint32_t)) {
             printf(" time=%lu.%03lu ms", (long unsigned)triptime / 1000,
                    (long unsigned)triptime % 1000);
@@ -372,9 +407,11 @@ static void _print_reply(_ping_data_t *data, gnrc_pktsnip_t *icmpv6,
 
 static void _handle_reply(_ping_data_t *data, gnrc_pktsnip_t *pkt)
 {
-    gnrc_pktsnip_t *ipv6, *icmpv6;
+    gnrc_pktsnip_t *netif, *ipv6, *icmpv6;
+    gnrc_netif_hdr_t *netif_hdr;
     ipv6_hdr_t *ipv6_hdr;
 
+    netif = gnrc_pktsnip_search_type(pkt, GNRC_NETTYPE_NETIF);
     ipv6 = gnrc_pktsnip_search_type(pkt, GNRC_NETTYPE_IPV6);
     icmpv6 = gnrc_pktsnip_search_type(pkt, GNRC_NETTYPE_ICMPV6);
     if ((ipv6 == NULL) || (icmpv6 == NULL)) {
@@ -382,7 +419,8 @@ static void _handle_reply(_ping_data_t *data, gnrc_pktsnip_t *pkt)
         return;
     }
     ipv6_hdr = ipv6->data;
-    _print_reply(data, icmpv6, &ipv6_hdr->src, ipv6_hdr->hl);
+    netif_hdr = netif ? netif->data : NULL;
+    _print_reply(data, icmpv6, &ipv6_hdr->src, ipv6_hdr->hl, netif_hdr);
 #ifdef MODULE_GNRC_IPV6_NIB
     /* successful ping to neighbor (NIB handles case if ipv6->src is not a
      * neighbor) can be taken as upper-layer hint for reachability:

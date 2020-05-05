@@ -1,6 +1,4 @@
-ifneq (,$(filter saul_default,$(USEMODULE)))
-  USEMODULE += saul_adc
-  USEMODULE += saul_gpio
-endif
+# This board uses the shared board_init function
+USEMODULE += boards_common_kw41z
 
-include $(RIOTCPU)/kinetis/Makefile.dep
+include $(RIOTBOARD)/common/kw41z/Makefile.dep

@@ -20,8 +20,9 @@
 #define PERIPH_CONF_H
 
 #include "periph_cpu.h"
-#include "periph_conf_common.h"
 #include "cfg_clock_16_1.h"
+#include "cfg_timer_012.h"
+#include "cfg_rtt_default.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,7 +34,6 @@ extern "C" {
  */
 #define UART_NUMOF          (1U)
 /* UART pin configuration */
-#define UART_HWFLOWCTRL     1
 #define UART_PIN_RX         11
 #define UART_PIN_TX         9
 #define UART_PIN_RTS        8
@@ -53,7 +53,7 @@ static const spi_conf_t spi_config[] = {
     }
 };
 
-#define SPI_NUMOF           (sizeof(spi_config) / sizeof(spi_config[0]))
+#define SPI_NUMOF           ARRAY_SIZE(spi_config)
 /** @} */
 
 /**
@@ -70,8 +70,13 @@ static const i2c_conf_t i2c_config[] = {
     }
 };
 
-#define I2C_NUMOF           (sizeof(i2c_config) / sizeof(i2c_config[0]))
+#define I2C_NUMOF           ARRAY_SIZE(i2c_config)
 /** @} */
+
+/**
+ * @brief Enable the internal DC/DC converter
+ */
+#define NRF5X_ENABLE_DCDC
 
 #ifdef __cplusplus
 }

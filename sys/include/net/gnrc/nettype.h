@@ -43,6 +43,10 @@ typedef enum {
     /**
      * @brief   Not so much protocol but data type that is passed to network
      *          devices using the netdev interface
+     *
+     * @deprecated  Unused since https://github.com/RIOT-OS/RIOT/pull/11193.
+     *              Will be removed after 2020.10 release.
+     *
      */
     GNRC_NETTYPE_IOVEC = -2,
     /**
@@ -117,6 +121,10 @@ typedef enum {
 
 #ifdef MODULE_NDN_RIOT
     GNRC_NETTYPE_NDN,           /**< Protocol is NDN */
+#endif
+
+#ifdef MODULE_GNRC_LORAWAN
+    GNRC_NETTYPE_LORAWAN,       /**< Protocol is LoRaWAN */
 #endif
 
     /**

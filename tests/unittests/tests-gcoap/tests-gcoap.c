@@ -37,13 +37,15 @@ static const coap_resource_t resources_second[] = {
 
 static gcoap_listener_t listener = {
     .resources     = &resources[0],
-    .resources_len = (sizeof(resources) / sizeof(resources[0])),
+    .resources_len = ARRAY_SIZE(resources),
+    .link_encoder  = NULL,
     .next          = NULL
 };
 
 static gcoap_listener_t listener_second = {
     .resources     = &resources_second[0],
-    .resources_len = (sizeof(resources_second) / sizeof(resources_second[0])),
+    .resources_len = ARRAY_SIZE(resources_second),
+    .link_encoder  = NULL,
     .next          = NULL
 };
 
@@ -52,39 +54,41 @@ static const char *resource_list_str = "</act/switch>,</sensor/temp>,</test/info
 /*
  * Client GET request success case. Test request generation.
  * Request /time resource from libcoap example
- * Includes token of length GCOAP_TOKENLEN.
+ * Includes token of length CONFIG_GCOAP_TOKENLEN.
  */
 static void test_gcoap__client_get_req(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE];
     coap_pkt_t pdu;
     size_t len;
     char path[] = "/time";
 
-    /* Create expected pdu_data, with token length from GCOAP_TOKENLEN. */
+    /* Create expected pdu_data, with token length from CONFIG_GCOAP_TOKENLEN. */
     size_t hdr_fixed_len = 4;
     uint8_t hdr_fixed[]  = { 0x52, 0x01, 0xe6, 0x02 };
     size_t options_len   = 5;
     uint8_t options[]    = { 0xb4, 0x74, 0x69, 0x6d, 0x65 };
 
-    uint8_t pdu_data[hdr_fixed_len + GCOAP_TOKENLEN + options_len];
+    uint8_t pdu_data[hdr_fixed_len + CONFIG_GCOAP_TOKENLEN + options_len];
 
     memcpy(&pdu_data[0], &hdr_fixed[0], hdr_fixed_len);
-#if GCOAP_TOKENLEN
+#if CONFIG_GCOAP_TOKENLEN
     /* actual value is random */
-    memset(&pdu_data[hdr_fixed_len], 0x9b, GCOAP_TOKENLEN);
+    memset(&pdu_data[hdr_fixed_len], 0x9b, CONFIG_GCOAP_TOKENLEN);
 #endif
-    memcpy(&pdu_data[hdr_fixed_len + GCOAP_TOKENLEN], &options[0], options_len);
+    memcpy(&pdu_data[hdr_fixed_len + CONFIG_GCOAP_TOKENLEN], &options[0],
+           options_len);
 
-    len = gcoap_request(&pdu, &buf[0], GCOAP_PDU_BUF_SIZE, COAP_METHOD_GET,
-                                                           &path[0]);
+    len = gcoap_request(&pdu, &buf[0], CONFIG_GCOAP_PDU_BUF_SIZE,
+                                                COAP_METHOD_GET, &path[0]);
 
     TEST_ASSERT_EQUAL_INT(COAP_METHOD_GET, coap_get_code(&pdu));
-    TEST_ASSERT_EQUAL_INT(GCOAP_TOKENLEN, coap_get_token_len(&pdu));
-    TEST_ASSERT_EQUAL_INT(hdr_fixed_len + GCOAP_TOKENLEN, coap_get_total_hdr_len(&pdu));
+    TEST_ASSERT_EQUAL_INT(CONFIG_GCOAP_TOKENLEN, coap_get_token_len(&pdu));
+    TEST_ASSERT_EQUAL_INT(hdr_fixed_len + CONFIG_GCOAP_TOKENLEN,
+                          coap_get_total_hdr_len(&pdu));
     TEST_ASSERT_EQUAL_INT(COAP_TYPE_NON, coap_get_type(&pdu));
 
-    char uri[NANOCOAP_URI_MAX] = {0};
+    char uri[CONFIG_NANOCOAP_URI_MAX] = {0};
     coap_get_uri_path(&pdu, (uint8_t *)&uri[0]);
     TEST_ASSERT_EQUAL_STRING(&path[0], &uri[0]);
     TEST_ASSERT_EQUAL_INT(0, pdu.payload_len);
@@ -98,7 +102,7 @@ static void test_gcoap__client_get_req(void)
  */
 static void test_gcoap__client_get_resp(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE];
     coap_pkt_t pdu;
     int res;
     size_t hdr_fixed_len = 4;
@@ -133,17 +137,18 @@ static void test_gcoap__client_get_resp(void)
  */
 static void test_gcoap__client_put_req(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE]; /* header 4, token 2, path 11 */
     coap_pkt_t pdu;
     size_t len;
     char path[] = "/riot/value";
     char payload[] = "1";
 
-    gcoap_req_init(&pdu, buf, GCOAP_PDU_BUF_SIZE, COAP_METHOD_PUT, path);
+    gcoap_req_init(&pdu, buf, CONFIG_GCOAP_PDU_BUF_SIZE, COAP_METHOD_PUT, path);
+    coap_opt_add_format(&pdu, COAP_FORMAT_TEXT);
+    len = coap_opt_finish(&pdu, COAP_OPT_FINISH_PAYLOAD);
     memcpy(pdu.payload, payload, 1);
-    len = gcoap_finish(&pdu, 1, COAP_FORMAT_TEXT);
 
-    coap_parse(&pdu, buf, len);
+    coap_parse(&pdu, buf, len + 1);
 
     TEST_ASSERT_EQUAL_INT(COAP_METHOD_PUT, coap_get_code(&pdu));
     TEST_ASSERT_EQUAL_INT(1, pdu.payload_len);
@@ -151,35 +156,24 @@ static void test_gcoap__client_put_req(void)
 }
 
 /*
- * Builds on get_req test, to test gcoap_add_qstring() to add Uri-Query
- * options.
+ * Builds on client_put_req to test overfill on coap_opt_finish().
  */
-static void test_gcoap__client_get_query(void)
+static void test_gcoap__client_put_req_overfill(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    /* header 4, token 2, path 11, format 1, marker 1 = 19 */
+    uint8_t buf[18+CONFIG_GCOAP_REQ_OPTIONS_BUF];
     coap_pkt_t pdu;
-    char path[] = "/time";
-    char key1[] = "ab";
-    char val1[] = "cde";
-    char key2[] = "f";
-    char expected[] = "ab=cde&f";
-    int optlen;
+    ssize_t len;
+    char path[] = "/riot/value";
 
-    gcoap_req_init(&pdu, buf, GCOAP_PDU_BUF_SIZE, COAP_METHOD_GET, path);
+    gcoap_req_init(&pdu, buf, sizeof(buf), COAP_METHOD_PUT, path);
+    TEST_ASSERT_EQUAL_INT(1, pdu.payload_len);
 
-    optlen = gcoap_add_qstring(&pdu, key1, val1);
-    TEST_ASSERT_EQUAL_INT(7, optlen);
-    optlen = gcoap_add_qstring(&pdu, key2, NULL);
-    TEST_ASSERT_EQUAL_INT(2, optlen);
+    coap_opt_add_format(&pdu, COAP_FORMAT_TEXT);
+    TEST_ASSERT_EQUAL_INT(0, pdu.payload_len);
 
-    size_t len = gcoap_finish(&pdu, 0, COAP_FORMAT_NONE);
-
-    coap_parse(&pdu, buf, len);
-
-    char query[20] = {0};
-    coap_get_uri_query(&pdu, (uint8_t *)&query[0]);
-    /* skip initial '&' from coap_get_uri_query() */
-    TEST_ASSERT_EQUAL_STRING(&expected[0], &query[1]);
+    len = coap_opt_finish(&pdu, COAP_OPT_FINISH_PAYLOAD);
+    TEST_ASSERT_EQUAL_INT(-ENOSPC, len);
 }
 
 /*
@@ -188,24 +182,47 @@ static void test_gcoap__client_get_query(void)
  */
 static void test_gcoap__client_get_path_defer(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE];
     coap_pkt_t pdu;
     size_t len, optlen;
     char path[] = "/time";
 
-    gcoap_req_init(&pdu, buf, GCOAP_PDU_BUF_SIZE, COAP_METHOD_GET, NULL);
+    gcoap_req_init(&pdu, buf, CONFIG_GCOAP_PDU_BUF_SIZE, COAP_METHOD_GET, NULL);
     coap_opt_add_uint(&pdu, COAP_OPT_OBSERVE, 0);
     coap_opt_add_string(&pdu, COAP_OPT_URI_PATH, path, '/');
     optlen = 6;
 
-    len = gcoap_finish(&pdu, 0, COAP_FORMAT_NONE);
-    TEST_ASSERT_EQUAL_INT(len, sizeof(coap_hdr_t) + GCOAP_TOKENLEN + optlen);
+    len = coap_opt_finish(&pdu, COAP_OPT_FINISH_NONE);
+    TEST_ASSERT_EQUAL_INT(len,
+                          sizeof(coap_hdr_t) + CONFIG_GCOAP_TOKENLEN +optlen);
 
     coap_parse(&pdu, buf, len);
 
-    char uri[NANOCOAP_URI_MAX] = {0};
+    char uri[CONFIG_NANOCOAP_URI_MAX] = {0};
     coap_get_uri_path(&pdu, (uint8_t *)&uri[0]);
     TEST_ASSERT_EQUAL_STRING(&path[0], &uri[0]);
+}
+
+/*
+ * Validate client CoAP ping empty message request.
+ */
+static void test_gcoap__client_ping(void)
+{
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE];
+    coap_pkt_t pdu;
+    int res;
+
+    res = gcoap_req_init(&pdu, buf, CONFIG_GCOAP_PDU_BUF_SIZE, COAP_CODE_EMPTY,
+                         NULL);
+
+    TEST_ASSERT_EQUAL_INT(0, res);
+    TEST_ASSERT_EQUAL_INT(COAP_CODE_EMPTY, coap_get_code(&pdu));
+    TEST_ASSERT_EQUAL_INT(COAP_TYPE_CON, coap_get_type(&pdu));
+    TEST_ASSERT_EQUAL_INT(0, coap_get_token_len(&pdu));
+
+    /* confirm length */
+    res = coap_opt_finish(&pdu, COAP_OPT_FINISH_NONE);
+    TEST_ASSERT_EQUAL_INT(4, res);
 }
 
 /*
@@ -231,7 +248,7 @@ static int _read_cli_stats_req(coap_pkt_t *pdu, uint8_t *buf)
 /* Server GET request success case. Validate request example. */
 static void test_gcoap__server_get_req(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE];
     coap_pkt_t pdu;
 
     int res = _read_cli_stats_req(&pdu, &buf[0]);
@@ -243,7 +260,7 @@ static void test_gcoap__server_get_req(void)
     TEST_ASSERT_EQUAL_INT(COAP_TYPE_NON, coap_get_type(&pdu));
     TEST_ASSERT_EQUAL_INT(0, pdu.payload_len);
 
-    char uri[NANOCOAP_URI_MAX] = {0};
+    char uri[CONFIG_NANOCOAP_URI_MAX] = {0};
     coap_get_uri_path(&pdu, (uint8_t *)&uri[0]);
     TEST_ASSERT_EQUAL_STRING("/cli/stats", &uri[0]);
 }
@@ -254,7 +271,7 @@ static void test_gcoap__server_get_req(void)
  */
 static void test_gcoap__server_get_resp(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE];
     coap_pkt_t pdu;
 
     /* read request */
@@ -262,9 +279,11 @@ static void test_gcoap__server_get_resp(void)
 
     /* generate response */
     gcoap_resp_init(&pdu, &buf[0], sizeof(buf), COAP_CODE_CONTENT);
+    coap_opt_add_format(&pdu, COAP_FORMAT_TEXT);
+    ssize_t res = coap_opt_finish(&pdu, COAP_OPT_FINISH_PAYLOAD);
+
     char resp_payload[]  = "2";
     memcpy(&pdu.payload[0], &resp_payload[0], strlen(resp_payload));
-    ssize_t res = gcoap_finish(&pdu, strlen(resp_payload), COAP_FORMAT_TEXT);
 
     uint8_t resp_data[] = {
         0x52, 0x45, 0x20, 0xb6, 0x35, 0x61, 0xc0, 0xff,
@@ -275,8 +294,7 @@ static void test_gcoap__server_get_resp(void)
     TEST_ASSERT_EQUAL_INT(2, coap_get_token_len(&pdu));
     TEST_ASSERT_EQUAL_INT(4 + 2, coap_get_total_hdr_len(&pdu));
     TEST_ASSERT_EQUAL_INT(COAP_TYPE_NON, coap_get_type(&pdu));
-    TEST_ASSERT_EQUAL_INT(strlen(resp_payload), pdu.payload_len);
-    TEST_ASSERT_EQUAL_INT(sizeof(resp_data), res);
+    TEST_ASSERT_EQUAL_INT(sizeof(resp_data), res + 1);
 
     for (size_t i = 0; i < strlen(resp_payload); i++) {
         TEST_ASSERT_EQUAL_INT(resp_payload[i], pdu.payload[i]);
@@ -302,7 +320,7 @@ static int _read_cli_stats_req_con(coap_pkt_t *pdu, uint8_t *buf)
 /* Server CON GET request success case. Validate request is confirmable. */
 static void test_gcoap__server_con_req(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE];
     coap_pkt_t pdu;
 
     int res = _read_cli_stats_req_con(&pdu, &buf[0]);
@@ -318,7 +336,7 @@ static void test_gcoap__server_con_req(void)
  */
 static void test_gcoap__server_con_resp(void)
 {
-    uint8_t buf[GCOAP_PDU_BUF_SIZE];
+    uint8_t buf[CONFIG_GCOAP_PDU_BUF_SIZE];
     coap_pkt_t pdu;
 
     /* read request */
@@ -326,9 +344,11 @@ static void test_gcoap__server_con_resp(void)
 
     /* generate response */
     gcoap_resp_init(&pdu, &buf[0], sizeof(buf), COAP_CODE_CONTENT);
+    coap_opt_add_format(&pdu, COAP_FORMAT_TEXT);
+    ssize_t res = coap_opt_finish(&pdu, COAP_OPT_FINISH_PAYLOAD);
+
     char resp_payload[]  = "2";
     memcpy(&pdu.payload[0], &resp_payload[0], strlen(resp_payload));
-    ssize_t res = gcoap_finish(&pdu, strlen(resp_payload), COAP_FORMAT_TEXT);
 
     uint8_t resp_data[] = {
         0x62, 0x45, 0x8e, 0x03, 0x35, 0x61, 0xc0, 0xff,
@@ -337,7 +357,7 @@ static void test_gcoap__server_con_resp(void)
 
     TEST_ASSERT_EQUAL_INT(COAP_CLASS_SUCCESS, coap_get_code_class(&pdu));
     TEST_ASSERT_EQUAL_INT(COAP_TYPE_ACK, coap_get_type(&pdu));
-    TEST_ASSERT_EQUAL_INT(sizeof(resp_data), res);
+    TEST_ASSERT_EQUAL_INT(sizeof(resp_data), res + 1);
 }
 
 /*
@@ -371,8 +391,9 @@ Test *tests_gcoap_tests(void)
         new_TestFixture(test_gcoap__client_get_req),
         new_TestFixture(test_gcoap__client_get_resp),
         new_TestFixture(test_gcoap__client_put_req),
-        new_TestFixture(test_gcoap__client_get_query),
+        new_TestFixture(test_gcoap__client_put_req_overfill),
         new_TestFixture(test_gcoap__client_get_path_defer),
+        new_TestFixture(test_gcoap__client_ping),
         new_TestFixture(test_gcoap__server_get_req),
         new_TestFixture(test_gcoap__server_get_resp),
         new_TestFixture(test_gcoap__server_con_req),

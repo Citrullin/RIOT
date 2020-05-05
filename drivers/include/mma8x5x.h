@@ -40,9 +40,21 @@
 extern "C" {
 #endif
 
-#ifndef MMA8X5X_I2C_ADDRESS
-#define MMA8X5X_I2C_ADDRESS           0x1D /**< Accelerometer Default Address */
+/**
+ * @defgroup drivers_mma8x5x_config     MMA8x5x Accelerometer driver compile configuration
+ * @ingroup config_drivers_sensors
+ * @{
+ */
+/**
+ * @brief   Accelerometer Default Address
+ *
+ * The address value depends on the state of SA0 Address Pin in the case of MMA845x series.
+ * For more details refer Table 1 in datasheet (MMA8451Q/MMA8452Q/MMA8453Q)
+ */
+#ifndef CONFIG_MMA8X5X_I2C_ADDRESS
+#define CONFIG_MMA8X5X_I2C_ADDRESS           0x1D
 #endif
+/** @} */
 
 /**
  * @brief   Devices supported by this driver
@@ -59,14 +71,14 @@ enum {
  * @brief   Available sampling rates
  */
 enum {
-    MMA8X5X_RATE_800HZ = (0 << 3),  /**< 800 Hz Ouput Data Rate in WAKE mode */
-    MMA8X5X_RATE_400HZ = (1 << 3),  /**< 400 Hz Ouput Data Rate in WAKE mode */
-    MMA8X5X_RATE_200HZ = (2 << 3),  /**< 200 Hz Ouput Data Rate in WAKE mode */
-    MMA8X5X_RATE_100HZ = (3 << 3),  /**< 100 Hz Ouput Data Rate in WAKE mode */
-    MMA8X5X_RATE_50HZ  = (4 << 3),  /**< 50 Hz Ouput Data Rate in WAKE mode */
-    MMA8X5X_RATE_1HZ25 = (5 << 3),  /**< 12.5 Hz Ouput Data Rate in WAKE mode */
-    MMA8X5X_RATE_6HZ25 = (6 << 3),  /**< 6.25 Hz Ouput Data Rate in WAKE mode */
-    MMA8X5X_RATE_1HZ56 = (7 << 3)   /**< 1.56 Hz Ouput Data Rate in WAKE mode */
+    MMA8X5X_RATE_800HZ = (0 << 3),  /**< 800 Hz Output Data Rate in WAKE mode */
+    MMA8X5X_RATE_400HZ = (1 << 3),  /**< 400 Hz Output Data Rate in WAKE mode */
+    MMA8X5X_RATE_200HZ = (2 << 3),  /**< 200 Hz Output Data Rate in WAKE mode */
+    MMA8X5X_RATE_100HZ = (3 << 3),  /**< 100 Hz Output Data Rate in WAKE mode */
+    MMA8X5X_RATE_50HZ  = (4 << 3),  /**< 50 Hz Output Data Rate in WAKE mode */
+    MMA8X5X_RATE_1HZ25 = (5 << 3),  /**< 12.5 Hz Output Data Rate in WAKE mode */
+    MMA8X5X_RATE_6HZ25 = (6 << 3),  /**< 6.25 Hz Output Data Rate in WAKE mode */
+    MMA8X5X_RATE_1HZ56 = (7 << 3)   /**< 1.56 Hz Output Data Rate in WAKE mode */
 };
 
 /**

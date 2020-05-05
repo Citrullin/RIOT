@@ -20,66 +20,13 @@
 #define PERIPH_CONF_H
 
 #include "periph_cpu.h"
+#include "l4/cfg_clock_80_1.h"
 #include "cfg_i2c1_pb8_pb9.h"
+#include "cfg_rtt_default.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/**
- * @name    Clock system configuration
- * @{
- */
-/* 0: no external high speed crystal available
- * else: actual crystal frequency [in Hz] */
-#define CLOCK_HSE           (0)
-
-#ifndef CLOCK_LSE
-/* 0: no external low speed crystal available,
- * 1: external crystal available (always 32.768kHz) */
-#define CLOCK_LSE           (1)
-#endif
-
-/* 0: enable MSI only if HSE isn't available
- * 1: always enable MSI (e.g. if USB or RNG is used)*/
-#define CLOCK_MSI_ENABLE    (1)
-
-#ifndef CLOCK_MSI_LSE_PLL
-/* 0: disable Hardware auto calibration with LSE
- * 1: enable Hardware auto calibration with LSE (PLL-mode)
- * Same as with CLOCK_LSE above this defaults to 0 because LSE is
- * mandatory for MSI/LSE-trimming to work */
-#define CLOCK_MSI_LSE_PLL   (0)
-#endif
-
-/* give the target core clock (HCLK) frequency [in Hz], maximum: 80MHz */
-#define CLOCK_CORECLOCK     (80000000U)
-/* PLL configuration: make sure your values are legit!
- *
- * compute by: CORECLOCK = (((PLL_IN / M) * N) / R)
- * with:
- * PLL_IN:  input clock, HSE or MSI @ 48MHz
- * M:       pre-divider,  allowed range: [1:8]
- * N:       multiplier,   allowed range: [8:86]
- * R:       post-divider, allowed range: [2,4,6,8]
- *
- * Also the following constraints need to be met:
- * (PLL_IN / M)     -> [4MHz:16MHz]
- * (PLL_IN / M) * N -> [64MHz:344MHz]
- * CORECLOCK        -> 80MHz MAX!
- */
-#define CLOCK_PLL_M         (6)
-#define CLOCK_PLL_N         (20)
-#define CLOCK_PLL_R         (2)
-/* peripheral clock setup */
-#define CLOCK_AHB_DIV       RCC_CFGR_HPRE_DIV1
-#define CLOCK_AHB           (CLOCK_CORECLOCK / 1)
-#define CLOCK_APB1_DIV      RCC_CFGR_PPRE1_DIV4
-#define CLOCK_APB1          (CLOCK_CORECLOCK / 4)
-#define CLOCK_APB2_DIV      RCC_CFGR_PPRE2_DIV2
-#define CLOCK_APB2          (CLOCK_CORECLOCK / 2)
-/** @} */
-
 
 /**
  * @name    Timer configuration
@@ -105,7 +52,7 @@ static const timer_conf_t timer_config[] = {
 #define TIMER_0_ISR         isr_tim2
 #define TIMER_1_ISR         isr_tim5
 
-#define TIMER_NUMOF         (sizeof(timer_config) / sizeof(timer_config[0]))
+#define TIMER_NUMOF         ARRAY_SIZE(timer_config)
 /** @} */
 
 /**
@@ -147,7 +94,7 @@ static const uart_conf_t uart_config[] = {
 #define UART_1_ISR          (isr_usart3)
 #define UART_1_DMA_ISR      (isr_dma1_stream5)
 
-#define UART_NUMOF          (sizeof(uart_config) / sizeof(uart_config[0]))
+#define UART_NUMOF          ARRAY_SIZE(uart_config)
 /** @} */
 
 /**
@@ -177,7 +124,7 @@ static const pwm_conf_t pwm_config[] = {
     },
 };
 
-#define PWM_NUMOF           (sizeof(pwm_config) / sizeof(pwm_config[0]))
+#define PWM_NUMOF           ARRAY_SIZE(pwm_config)
 /** @} */
 
 /**
@@ -211,31 +158,16 @@ static const spi_conf_t spi_config[] = {
         .miso_pin = GPIO_PIN(PORT_A, 6),
         .sclk_pin = GPIO_PIN(PORT_A, 5),
         .cs_pin   = GPIO_UNDEF,
-        .af       = GPIO_AF5,
+        .mosi_af  = GPIO_AF5,
+        .miso_af  = GPIO_AF5,
+        .sclk_af  = GPIO_AF5,
+        .cs_af    = GPIO_AF5,
         .rccmask  = RCC_APB2ENR_SPI1EN,
         .apbbus   = APB2
     }
 };
 
-#define SPI_NUMOF           (sizeof(spi_config) / sizeof(spi_config[0]))
-/** @} */
-
-/**
- * @name    RTT configuration
- *
- * On the STM32Lx platforms, we always utilize the LPTIM1.
- * @{
- */
-#define RTT_NUMOF           (1)
-#define RTT_FREQUENCY       (1024U)             /* 32768 / 2^n */
-#define RTT_MAX_VALUE       (0x0000ffff)        /* 16-bit timer */
-/** @} */
-
-/**
- * @name   RTC configuration
- * @{
- */
-#define RTC_NUMOF           (1)
+#define SPI_NUMOF           ARRAY_SIZE(spi_config)
 /** @} */
 
 #ifdef __cplusplus

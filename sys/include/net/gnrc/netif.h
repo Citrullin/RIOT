@@ -30,10 +30,14 @@
 
 #include "kernel_types.h"
 #include "msg.h"
+#include "event.h"
 #include "net/ipv6/addr.h"
 #include "net/gnrc/netapi.h"
 #include "net/gnrc/pkt.h"
 #include "net/gnrc/netif/conf.h"
+#ifdef MODULE_GNRC_LORAWAN
+#include "net/gnrc/netif/lorawan.h"
+#endif
 #ifdef MODULE_GNRC_SIXLOWPAN
 #include "net/gnrc/netif/6lo.h"
 #endif
@@ -54,6 +58,7 @@
 #include "net/netstats.h"
 #endif
 #include "rmutex.h"
+#include "net/netif.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,11 +73,15 @@ typedef struct gnrc_netif_ops gnrc_netif_ops_t;
  * @brief   Representation of a network interface
  */
 typedef struct {
+    netif_t netif;                          /**< network interface descriptor */
     const gnrc_netif_ops_t *ops;            /**< Operations of the network interface */
     netdev_t *dev;                          /**< Network device of the network interface */
     rmutex_t mutex;                         /**< Mutex of the interface */
 #ifdef MODULE_NETSTATS_L2
     netstats_t stats;                       /**< transceiver's statistics */
+#endif
+#if defined(MODULE_GNRC_LORAWAN) || DOXYGEN
+    gnrc_netif_lorawan_t lorawan;           /**< LoRaWAN component */
 #endif
 #if defined(MODULE_GNRC_IPV6) || DOXYGEN
     gnrc_netif_ipv6_t ipv6;                 /**< IPv6 component */
@@ -86,6 +95,16 @@ typedef struct {
      * @see net_gnrc_netif_flags
      */
     uint32_t flags;
+#if IS_USED(MODULE_GNRC_NETIF_EVENTS) || IS_ACTIVE(DOXYGEN)
+    /**
+     * @brief   Event queue for asynchronous events
+     */
+    event_queue_t evq;
+    /**
+     * @brief   ISR event for the network device
+     */
+    event_t event_isr;
+#endif /* MODULE_GNRC_NETIF_EVENTS */
 #if (GNRC_NETIF_L2ADDR_MAXLEN > 0) || DOXYGEN
     /**
      * @brief   The link-layer address currently used as the source address
@@ -129,10 +148,13 @@ struct gnrc_netif_ops {
      *
      * @param[in] netif The network interface.
      *
-     * This is called after the default settings were set, right before the
-     * interface's thread starts receiving messages. It is not necessary to lock
-     * the interface's mutex gnrc_netif_t::mutex, since the thread will already
-     * lock it. Leave NULL if you do not need any special initialization.
+     * This is called after the network device's initial configuration, right
+     * before the interface's thread starts receiving messages. It is not
+     * necessary to lock the interface's mutex gnrc_netif_t::mutex, since it is
+     * already locked. Set to @ref gnrc_netif_default_init() if you do not need
+     * any special initialization. If you do need special initialization, it is
+     * recommended to call @ref gnrc_netif_default_init() at the start of the
+     * custom initialization function set here.
      */
     void (*init)(gnrc_netif_t *netif);
 
@@ -223,8 +245,19 @@ struct gnrc_netif_ops {
 };
 
 /**
+ * @brief   Initialize all available network interfaces.
+ *          This function is called automatically if the auto_init_gnrc_netif
+ *          module is used.
+ *          If only the gnrc_netif_init module is used instead, you can call
+ *          this function to manually set up the network interfaces at a later
+ *          time.
+ */
+void gnrc_netif_init_devs(void);
+
+/**
  * @brief   Creates a network interface
  *
+ * @param[out] netif    The interface. May not be `NULL`.
  * @param[in] stack     The stack for the network interface's thread.
  * @param[in] stacksize Size of @p stack.
  * @param[in] priority  Priority for the network interface's thread.
@@ -235,15 +268,12 @@ struct gnrc_netif_ops {
  * @note If @ref DEVELHELP is defined netif_params_t::name is used as the
  *       name of the network interface's thread.
  *
- * @attention   Fails and crashes (assertion error with @ref DEVELHELP or
- *              segmentation fault without) if `GNRC_NETIF_NUMOF` is lower than
- *              the number of calls to this function.
- *
- * @return  The network interface on success.
+ * @return  0 on success
+ * @return  negative number on error
  */
-gnrc_netif_t *gnrc_netif_create(char *stack, int stacksize, char priority,
-                                const char *name, netdev_t *dev,
-                                const gnrc_netif_ops_t *ops);
+int gnrc_netif_create(gnrc_netif_t *netif, char *stack, int stacksize,
+                      char priority, const char *name, netdev_t *dev,
+                      const gnrc_netif_ops_t *ops);
 
 /**
  * @brief   Get number of network interfaces actually allocated
@@ -251,6 +281,22 @@ gnrc_netif_t *gnrc_netif_create(char *stack, int stacksize, char priority,
  * @return  Number of network interfaces actually allocated
  */
 unsigned gnrc_netif_numof(void);
+
+/**
+ * @brief Check if there can only be one @ref gnrc_netif_t interface.
+ *
+ * > There can only be one!
+ *
+ * This function is used to allow compile time optimizations for
+ * single interface applications
+ *
+ * @return true, if there can only only one interface
+ * @return false, if there can be more than one interface
+ */
+static inline bool gnrc_netif_highlander(void)
+{
+    return IS_ACTIVE(GNRC_NETIF_SINGLE);
+}
 
 /**
  * @brief   Iterate over all network interfaces.
@@ -273,7 +319,7 @@ gnrc_netif_t *gnrc_netif_iter(const gnrc_netif_t *prev);
 gnrc_netif_t *gnrc_netif_get_by_pid(kernel_pid_t pid);
 
 /**
- * @brief   Gets the (unicast on anycast) IPv6 addresss of an interface (if IPv6
+ * @brief   Gets the (unicast on anycast) IPv6 address of an interface (if IPv6
  *          is supported)
  *
  * @pre `netif != NULL`
@@ -285,7 +331,7 @@ gnrc_netif_t *gnrc_netif_get_by_pid(kernel_pid_t pid);
  *                      addresses assigned to @p netif. May not be `NULL`
  * @param[in] max_len   Number of *bytes* available in @p addrs. Must be at
  *                      least `sizeof(ipv6_addr_t)`. It is recommended to use
- *                      @p GNRC_NETIF_IPV6_ADDRS_NUMOF `* sizeof(ipv6_addr_t)
+ *                      @p CONFIG_GNRC_NETIF_IPV6_ADDRS_NUMOF `* sizeof(ipv6_addr_t)
  *                      here (and have @p addrs of the according length).
  *
  * @return  Number of addresses in @p addrs times `sizeof(ipv6_addr_t)` on
@@ -433,6 +479,15 @@ static inline int gnrc_netif_ipv6_group_leave(const gnrc_netif_t *netif,
 }
 
 /**
+ * @brief   Default operation for gnrc_netif_ops_t::init()
+ *
+ * @note    Can also be used to be called *before* a custom operation.
+ *
+ * @param[in] netif     The network interface.
+ */
+void gnrc_netif_default_init(gnrc_netif_t *netif);
+
+/**
  * @brief   Default operation for gnrc_netif_ops_t::get()
  *
  * @note    Can also be used to be called *after* a custom operation.
@@ -496,6 +551,20 @@ char *gnrc_netif_addr_to_str(const uint8_t *addr, size_t addr_len, char *out);
  * @return  0, on failure.
  */
 size_t gnrc_netif_addr_from_str(const char *str, uint8_t *out);
+
+/**
+ * @brief   Send a GNRC packet via a given @ref gnrc_netif_t interface.
+ *
+ * @param netif         pointer to the interface
+ * @param pkt           packet to be sent.
+ *
+ * @return              1 if packet was successfully delivered
+ * @return              -1 on error
+ */
+static inline int gnrc_netif_send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+{
+    return gnrc_netapi_send(netif->pid, pkt);
+}
 
 #ifdef __cplusplus
 }

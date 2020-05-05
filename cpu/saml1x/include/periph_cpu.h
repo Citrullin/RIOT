@@ -27,12 +27,40 @@ extern "C" {
 #endif
 
 /**
- * @brief   Mapping of pins to EXTI lines, -1 means not EXTI possible
+ * @name    Power mode configuration
+ * @{
  */
-static const int8_t exti_config[1][32] = {
-    { 0,  1,  2,  3,  4,  5,  6,  7, -1, 0,  1,  2, -1, -1, 3, 4,
-      5,  6,  7,  0, -1, -1,  1,  2,  3, 4, -1,  5, -1, -1, 6, 7},
+#define PM_NUM_MODES        (1)
+/** @} */
+
+/**
+ * @brief   Override the default initial PM blocker
+ * @todo   Idle modes are enabled by default, deep sleep mode blocked
+ */
+#define PM_BLOCKER_INITIAL  0x00000001
+
+/**
+ * @name   SAML1x GCLK definitions
+ * @{
+ */
+enum {
+    SAM0_GCLK_MAIN = 0,                 /**< 16 MHz main clock      */
+    SAM0_GCLK_32KHZ,                    /**< 32 kHz clock           */
 };
+/** @} */
+
+#ifndef DOXYGEN
+#define HAVE_ADC_RES_T
+typedef enum {
+    ADC_RES_6BIT  = 0xff,                       /**< not supported */
+    ADC_RES_8BIT  = ADC_CTRLC_RESSEL_8BIT,      /**< ADC resolution: 8 bit */
+    ADC_RES_10BIT = ADC_CTRLC_RESSEL_10BIT,     /**< ADC resolution: 10 bit */
+    ADC_RES_12BIT = ADC_CTRLC_RESSEL_12BIT,     /**< ADC resolution: 12 bit */
+    ADC_RES_14BIT = 0xfe,                       /**< not supported */
+    ADC_RES_16BIT = 0xfd                        /**< not supported */
+} adc_res_t;
+#endif /* ndef DOXYGEN */
+/** @} */
 
 #ifdef __cplusplus
 }

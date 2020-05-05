@@ -11,14 +11,13 @@ import random
 import re
 import sys
 import subprocess
-import threading
 
-from scapy.all import Ether, IPv6, \
+from scapy.all import Ether, IPv6, UDP, \
                       IPv6ExtHdrHopByHop, IPv6ExtHdrDestOpt, \
                       IPv6ExtHdrFragment, IPv6ExtHdrRouting, \
                       ICMPv6ParamProblem, ICMPv6TimeExceeded, \
-                      sendp, srp1, sniff
-from testrunner import run
+                      sendp, srp1, AsyncSniffer
+from testrunner import run, check_unittests
 
 
 EXT_HDR_NH = {
@@ -31,44 +30,33 @@ EXT_HDR_NH = {
   }
 
 
-class Sniffer(threading.Thread):
+class Sniffer(object):
     def __init__(self, iface, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.stop_filter = None
-        self.stopped = False
         self.iface = iface
-        self.ps = []
-        self.enter_loop = threading.Event()
-        self.sniff_results = threading.Event()
-
-    def run(self):
-        while True:
-            self.enter_loop.wait()
-            self.enter_loop.clear()
-            if self.stopped:
-                return
-            if self.stop_filter:
-                self.ps = sniff(stop_filter=self.stop_filter,
-                                iface=self.iface, timeout=5)
-                self.stop_filter = None
-                self.sniff_results.set()
+        self.sniffer = None
+        self.stop_filter = None
 
     def start_sniff(self, stop_filter):
+        assert self.sniffer is None
         self.stop_filter = stop_filter
-        self.enter_loop.set()
+        self.sniffer = AsyncSniffer(
+            iface=self.iface,
+            stop_filter=stop_filter,
+        )
+        self.sniffer.start()
 
-    def wait_for_sniff_results(self):
-        res = []
-        if self.sniff_results.wait(5):
-            self.sniff_results.clear()
-            res = self.ps
-        self.ps = []
-        return res
-
-    def stop(self):
-        self.stopped = True
-        self.enter_loop.set()
-        self.join()
+    def wait_for_sniff_results(self, timeout=5):
+        assert self.sniffer is not None
+        self.sniffer.join(timeout=timeout)
+        sniffer = self.sniffer
+        self.sniffer = None
+        if sniffer.results is None:
+            return []
+        return [p for p in sniffer.results
+                # filter out packets only belonging to stop_filter if
+                # it existed
+                if sniffer.kwargs.get("stop_filter") is None or
+                sniffer.kwargs["stop_filter"](p)]
 
 
 sniffer = None
@@ -143,7 +131,7 @@ def unregister(child):
 
 def get_first_interface(child):
     child.sendline("ifconfig")
-    child.expect(r"Iface\s+(\d+)")
+    child.expect(r"Iface\s+(\d+)\s")
     return int(child.match.group(1))
 
 
@@ -194,29 +182,37 @@ def test_seg_left_gt_len_addresses(child, iface, hw_dst, ll_dst, ll_src):
 
 def test_multicast_dst(child, iface, hw_dst, ll_dst, ll_src):
     # sniffing for ICMPv6 parameter problem message
-    sniffer.start_sniff(lambda p: p.haslayer(ICMPv6ParamProblem))
+    sniffer.start_sniff(lambda p: p.haslayer(ICMPv6ParamProblem) or
+                        (p.haslayer(UDP) and (p[IPv6].dst != "ff02::1")))
     # send routing header with multicast destination
     sendp(Ether(dst=hw_dst) / IPv6(dst="ff02::1", src=ll_src) /
-          IPv6ExtHdrRouting(type=3, segleft=1, addresses=["abcd::1"]),
-          iface=iface, verbose=0)
+          IPv6ExtHdrRouting(type=3, segleft=1, addresses=["abcd::1"]) /
+          UDP(dport=2606), iface=iface, verbose=0)
     ps = sniffer.wait_for_sniff_results()
-    p = [p for p in ps if ICMPv6ParamProblem in p]
-    assert(len(p) > 0)
-    p = p[0]
-    assert(p[ICMPv6ParamProblem].code == 0)     # erroneous header field encountered
-    assert(p[ICMPv6ParamProblem].ptr == 24)     # IPv6 headers destination field
+    p = [p for p in ps if (ICMPv6ParamProblem in p) or
+                          ((UDP in p) and (p[UDP].dport == 2606) and
+                           (p[IPv6].dst != "ff02::1"))]
+    # packet should be discarded silently:
+    # see https://tools.ietf.org/html/rfc6554#section-4.2
+    assert(len(p) == 0)
     pktbuf_empty(child)
 
 
 def test_multicast_addr(child, iface, hw_dst, ll_dst, ll_src):
+    # sniffing for ICMPv6 parameter problem message
+    sniffer.start_sniff(lambda p: p.haslayer(ICMPv6ParamProblem) or
+                        (p.haslayer(UDP) and (p[IPv6].dst != ll_dst)))
     # Send routing header with multicast address in its destinations
-    p = srp1(Ether(dst=hw_dst) / IPv6(dst=ll_dst, src=ll_src) /
-             IPv6ExtHdrRouting(type=3, segleft=1, addresses=["ff02::1"]),
-             iface=iface, timeout=1, verbose=0)
-    assert(p is not None)
-    assert(ICMPv6ParamProblem in p)
-    assert(p[ICMPv6ParamProblem].code == 0)     # erroneous header field encountered
-    assert(p[ICMPv6ParamProblem].ptr == 48)     # first address in routing header
+    sendp(Ether(dst=hw_dst) / IPv6(dst=ll_dst, src=ll_src) /
+          IPv6ExtHdrRouting(type=3, segleft=1, addresses=["abcd::1"]) /
+          UDP(dport=2606), iface=iface, verbose=0)
+    ps = sniffer.wait_for_sniff_results()
+    p = [p for p in ps if (ICMPv6ParamProblem in p) or
+                          ((UDP in p) and (p[UDP].dport == 2606) and
+                           (p[IPv6].dst != ll_dst))]
+    # packet should be discarded silently:
+    # see https://tools.ietf.org/html/rfc6554#section-4.2
+    assert(len(p) == 0)
     pktbuf_empty(child)
 
 
@@ -329,17 +325,16 @@ def test_time_exc(child, iface, hw_dst, ll_dst, ll_src):
 def testfunc(child):
     global sniffer
     tap = get_bridge(os.environ["TAP"])
-
-    child.expect(r"OK \((\d+) tests\)")     # wait for and check result of unittests
-    print("." * int(child.match.group(1)), end="", flush=True)
+    child.sendline("unittests")
+    # wait for and check result of unittests
+    print("." * check_unittests(child), end="", flush=True)
     lladdr_src = get_host_lladdr(tap)
     child.sendline("ifconfig")
-    child.expect("HWaddr: (?P<hwaddr>[A-Fa-f:0-9]+)")
+    child.expect(r"HWaddr: (?P<hwaddr>[A-Fa-f:0-9]+)\s")
     hwaddr_dst = child.match.group("hwaddr").lower()
-    child.expect("(?P<lladdr>fe80::[A-Fa-f:0-9]+)")
+    child.expect(r"(?P<lladdr>fe80::[A-Fa-f:0-9]+)\s")
     lladdr_dst = child.match.group("lladdr").lower()
     sniffer = Sniffer(tap)
-    sniffer.start()
 
     def run(func):
         if child.logfile == sys.stdout:
@@ -364,7 +359,6 @@ def testfunc(child):
     run(test_seq_left_0)
     run(test_time_exc)
     print("SUCCESS")
-    sniffer.stop()
 
 
 if __name__ == "__main__":

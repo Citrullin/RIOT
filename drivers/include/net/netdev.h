@@ -204,6 +204,13 @@ extern "C" {
 #include "net/l2filter.h"
 #endif
 
+/**
+ * @name        Network device types
+ * @anchor      net_netdev_type
+ * @attention   When implementing a new type that is able to carry IPv6, have
+ *              a look if you need to update @ref net_l2util as well.
+ * @{
+ */
 enum {
     NETDEV_TYPE_UNKNOWN,
     NETDEV_TYPE_TEST,
@@ -217,6 +224,7 @@ enum {
     NETDEV_TYPE_SLIP,
     NETDEV_TYPE_ESP_NOW,
 };
+/** @} */
 
 /**
  * @brief   Possible event types that are send from the device driver to the
@@ -275,7 +283,7 @@ typedef void (*netdev_event_cb_t)(netdev_t *dev, netdev_event_t event);
 struct netdev {
     const struct netdev_driver *driver;     /**< ptr to that driver's interface. */
     netdev_event_cb_t event_callback;       /**< callback for device events */
-    void* context;                          /**< ptr to network stack context */
+    void *context;                          /**< ptr to network stack context */
 #ifdef MODULE_NETDEV_LAYER
     netdev_t *lower;                        /**< ptr to the lower netdev layer */
 #endif
@@ -297,7 +305,11 @@ typedef struct netdev_driver {
      * @pre `(dev != NULL) && (iolist != NULL`
      *
      * @param[in] dev       Network device descriptor. Must not be NULL.
-     * @param[in] iolist    io vector list to send
+     * @param[in] iolist    IO vector list to send. Elements of this list may
+     *                      have iolist_t::iol_data == NULL or
+     *                      iolist_t::iol_size == 0. However, unless otherwise
+     *                      specified by the device, the *first* element
+     *                      must contain data.
      *
      * @return negative errno on error
      * @return number of bytes sent
@@ -457,7 +469,20 @@ static inline int netdev_set_notsup(netdev_t *dev, netopt_t opt,
     return -ENOTSUP;
 }
 
-
+/**
+ * @brief Informs netdev there was an interrupt request from the network device.
+ *
+ *        This function calls @ref netdev_t::event_callback with
+ *        NETDEV_EVENT_ISR event.
+ *
+ * @param netdev netdev instance of the device associated to the interrupt.
+ */
+static inline void netdev_trigger_event_isr(netdev_t *netdev)
+{
+    if (netdev->event_callback) {
+        netdev->event_callback(netdev, NETDEV_EVENT_ISR);
+    }
+}
 #ifdef __cplusplus
 }
 #endif

@@ -1,26 +1,32 @@
 # set default port depending on operating system
-OS := $(shell uname)
 ifeq ($(OS),Linux)
-  PORT ?= $(PORT_LINUX)
+  PORT ?= $(call ensure_value,$(PORT_LINUX),No port set)
 else ifeq ($(OS),Darwin)
-  PORT ?= $(PORT_DARWIN)
+  PORT ?= $(call ensure_value,$(PORT_DARWIN),No port set)
 endif
-ifeq ($(PORT),)
-  $(info Warning: no PORT set!)
-endif
-export PORT
+
+# Default PROG_DEV is the same as PORT
+PROG_DEV ?= $(PORT)
 
 export BAUD ?= 115200
 
 RIOT_TERMINAL ?= pyterm
 ifeq ($(RIOT_TERMINAL),pyterm)
   TERMPROG  ?= $(RIOTTOOLS)/pyterm/pyterm
-  TERMFLAGS ?= -p "$(PORT)" -b "$(BAUD)"
+  TERMFLAGS ?= -p "$(PORT)" -b "$(BAUD)" $(PYTERMFLAGS)
 else ifeq ($(RIOT_TERMINAL),socat)
   SOCAT_OUTPUT ?= -
   TERMPROG ?= $(RIOT_TERMINAL)
   TERMFLAGS ?= $(SOCAT_OUTPUT) open:$(PORT),b$(BAUD),echo=0,raw
 else ifeq ($(RIOT_TERMINAL),picocom)
   TERMPROG  ?= picocom
-  TERMFLAGS ?= --nolock --imap lfcrlf --echo --baud "$(BAUD)" "$(PORT)"
+  TERMFLAGS ?= --nolock --imap lfcrlf --baud "$(BAUD)" "$(PORT)"
+else ifeq ($(RIOT_TERMINAL),miniterm)
+  TERMPROG  ?= miniterm.py
+  # The RIOT shell will still transmit back a CRLF, but at least with --eol LF
+  # we avoid sending two lines on every "enter".
+  TERMFLAGS ?= --eol LF "$(PORT)" "$(BAUD)" $(MINITERMFLAGS)
+else ifeq ($(RIOT_TERMINAL),jlink)
+  TERMPROG = $(RIOTTOOLS)/jlink/jlink.sh
+  TERMFLAGS = term-rtt
 endif

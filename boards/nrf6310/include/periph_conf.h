@@ -23,8 +23,9 @@
 #define PERIPH_CONF_H
 
 #include "periph_cpu.h"
-#include "periph_conf_common.h"
 #include "cfg_clock_16_1.h"
+#include "cfg_timer_012.h"
+#include "cfg_rtt_default.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,7 +42,6 @@ extern "C" {
 /* UART pin configuration */
 #define UART_PIN_RX       16
 #define UART_PIN_TX       17
-#define UART_HWFLOWCTRL   0
 #define UART_PIN_RTS      19
 #define UART_PIN_CTS      18
 /** @} */
@@ -65,7 +65,7 @@ static const spi_conf_t spi_config[] = {
     }
 };
 
-#define SPI_NUMOF           (sizeof(spi_config) / sizeof(spi_config[0]))
+#define SPI_NUMOF           ARRAY_SIZE(spi_config)
 /** @} */
 
 #ifdef __cplusplus

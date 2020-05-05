@@ -13,7 +13,7 @@
  * @ingroup     drivers_saul
  * @brief       Driver for the Freescale MAG3110 magnetometer.
  *
- * After initialization and set activ the magnetometer will make measurements
+ * After initialization and set active the magnetometer will make measurements
  * at periodic times.
  * The output rate and over sample ratio can be determined by magnetometer
  * initialization.
@@ -54,9 +54,21 @@ enum {
     MAG3110_ERROR_CNF,          /**< Device configuration failed */
 };
 
-#ifndef MAG3110_I2C_ADDRESS
-#define MAG3110_I2C_ADDRESS             0x0E /**< Magnetometer Default Address */
+/**
+ * @defgroup drivers_mag3110_config     MAG3110 Magnetometer driver compile configuration
+ * @ingroup config_drivers_sensors
+ * @{
+ */
+/**
+ * @brief Magnetometer default address
+ *
+ * The address depends on part number of MAG3110.
+ * For more information on SerialBus Address, refer Table 1 in Technical datasheet(MAG3110).
+ */
+#ifndef CONFIG_MAG3110_I2C_ADDRESS
+#define CONFIG_MAG3110_I2C_ADDRESS             0x0E
 #endif
+/** @} */
 
 /**
  * @name    Output data rate macros

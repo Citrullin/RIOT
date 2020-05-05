@@ -21,6 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 
 #include "async_read.h"
@@ -111,7 +112,7 @@ static int _send(netdev_t *netdev, const iolist_t *iolist)
     /* simulate TX_STARTED interrupt */
     if (netdev->event_callback) {
         dev->last_event = NETDEV_EVENT_TX_STARTED;
-        netdev->event_callback(netdev, NETDEV_EVENT_ISR);
+        netdev_trigger_event_isr(netdev);
         thread_yield();
     }
     res = writev(dev->sock_fd, v, n + 2);
@@ -122,7 +123,7 @@ static int _send(netdev_t *netdev, const iolist_t *iolist)
     /* simulate TX_COMPLETE interrupt */
     if (netdev->event_callback) {
         dev->last_event = NETDEV_EVENT_TX_COMPLETE;
-        netdev->event_callback(netdev, NETDEV_EVENT_ISR);
+        netdev_trigger_event_isr(netdev);
         thread_yield();
     }
 
@@ -208,13 +209,13 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
                     void *payload = &dev->rcv_buf[sizeof(zep_v2_data_hdr_t)];
 
                     if (zep->type != ZEP_V2_TYPE_DATA) {
-                        DEBUG("socket_zep::recv: unexpect ZEP type\n");
+                        DEBUG("socket_zep::recv: unexpected ZEP type\n");
                         /* don't support ACK frames for now*/
                         return -1;
                     }
                     if (((sizeof(zep_v2_data_hdr_t) + zep->length) != (unsigned)size) ||
                         (zep->length > len) || (zep->chan != dev->netdev.chan) ||
-                        /* TODO promiscous mode */
+                        /* TODO promiscuous mode */
                         _dst_not_me(dev, payload)) {
                         /* TODO: check checksum */
                         return -1;
@@ -282,7 +283,7 @@ static void _socket_isr(int fd, void *arg)
         socket_zep_t *dev = (socket_zep_t *)netdev;
 
         dev->last_event = NETDEV_EVENT_RX_COMPLETE;
-        netdev->event_callback(netdev, NETDEV_EVENT_ISR);
+        netdev_trigger_event_isr(netdev);
     }
 }
 
@@ -293,7 +294,7 @@ static int _init(netdev_t *netdev)
     netdev_ieee802154_reset(&dev->netdev);
 
     assert(dev != NULL);
-    dev->netdev.chan = IEEE802154_DEFAULT_CHANNEL;
+    dev->netdev.chan = CONFIG_IEEE802154_DEFAULT_CHANNEL;
 
     return 0;
 }

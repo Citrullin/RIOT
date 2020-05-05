@@ -22,7 +22,9 @@
 
 #include "periph_cpu.h"
 #include "cfg_clock_32_1.h"
+#include "cfg_i2c_default.h"
 #include "cfg_rtt_default.h"
+#include "cfg_spi_default.h"
 #include "cfg_timer_default.h"
 
 #ifdef __cplusplus
@@ -38,32 +40,23 @@ static const uart_conf_t uart_config[] = {
         .dev        = NRF_UARTE0,
         .rx_pin     = GPIO_PIN(0,19),
         .tx_pin     = GPIO_PIN(0,20),
-        .rts_pin    = (uint8_t)GPIO_UNDEF,
-        .cts_pin    = (uint8_t)GPIO_UNDEF,
+#ifdef MODULE_PERIPH_UART_HW_FC
+        .rts_pin    = GPIO_UNDEF,
+        .cts_pin    = GPIO_UNDEF,
+#endif
         .irqn       = UARTE0_UART0_IRQn,
     },
 };
 
 #define UART_0_ISR          (isr_uart0)
 
-#define UART_NUMOF          (sizeof(uart_config) / sizeof(uart_config[0]))
+#define UART_NUMOF          ARRAY_SIZE(uart_config)
 /** @} */
 
 /**
- * @name    SPI configuration
- * @{
+ * @brief Enable the internal DC/DC converter
  */
-static const spi_conf_t spi_config[] = {
-    {
-        .dev  = NRF_SPI0,
-        .sclk = 15,
-        .mosi = 13,
-        .miso = 14
-    }
-};
-
-#define SPI_NUMOF           (sizeof(spi_config) / sizeof(spi_config[0]))
-/** @} */
+#define NRF5X_ENABLE_DCDC
 
 #ifdef __cplusplus
 }

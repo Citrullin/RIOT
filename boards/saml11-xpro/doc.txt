@@ -12,7 +12,7 @@ memory. In addition, this SoC features the ARM TrustZone technology.
 
 ## Hardware
 
-![saml11-xpro image](https://www.microchip.com/_ImagedCopy/SAML11%20Xpro%20Front%20Title.jpg)
+![saml11-xpro image](https://www.microchip.com/_ImagedCopy/Converted-146683-1559149241-C16616-180424-MCU32-PHOTO-DM320205-Front-Transparent.png)
 
 
 ### MCU
@@ -51,14 +51,14 @@ memory. In addition, this SoC features the ARM TrustZone technology.
 | Low-level driver | GPIO    | yes       | |
 |        | PWM       | no            | |
 |        | UART      | yes           | |
-|        | I2C       | no        | |
-|        | SPI       | no        | |
+|        | I2C       | yes        | |
+|        | SPI       | yes        | |
 |        | USB       | no        | |
-|        | RTT       | no        | |
-|        | RTC       | no       |  |
-|        | RNG       | no        |  |
+|        | RTT       | yes       | |
+|        | RTC       | yes      |  |
+|        | RNG       | yes        |  |
 |        | Timer     | yes           | |
-|        | ADC       | no          | |
+|        | ADC       | yes         | |
 
 
 
