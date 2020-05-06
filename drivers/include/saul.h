@@ -136,7 +136,7 @@ enum {
     SAUL_SENSE_ID_PH,               /**< sensor: pH */
     SAUL_SENSE_ID_POWER,            /**< sensor: power */
     SAUL_SENSE_ID_SIZE,             /**< sensor: size */
-    SAUL_SENSE_ID_WEIGHT               /**< sensor: weight scale */
+    SAUL_SENSE_ID_WEIGHT,           /**< sensor: weight scale */
     SAUL_SENSE_NUMOF                /**< Number of actuators supported */
     /* Extend this list as needed, but keep SAUL_SENSE_ID_ANY the first and
      * SAUL_SENSE_NUMOF the last entry

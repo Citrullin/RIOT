@@ -7,6 +7,11 @@ BOARD ?= native
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
 
+USEMODULE += hx711
+USEMODULE += xtimer
+# Change these values, if your device is connected on different pins
+CFLAGS += "-DHX711_PARAM_SCK=GPIO_PIN(1, 13)"
+CFLAGS += "-DHX711_PARAM_DOUT=GPIO_PIN(1, 14)"
 # we want to use SAUL:
 USEMODULE += saul_default
 # include the shell:

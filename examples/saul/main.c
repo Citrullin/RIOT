@@ -22,6 +22,9 @@
 
 #include "shell.h"
 
+#define ENABLE_DEBUG  (1)
+#include "debug.h"
+
 int main(void)
 {
     puts("Welcome to RIOT!\n");
