@@ -193,7 +193,7 @@ typedef struct {
     uint32_t observe_value;                           /**< observe value           */
 #endif
 #ifdef MODULE_NANOCOAP_PKT_IPV6_ADDRESS
-    ipv6_addr_t source;                               /**< request source address  */
+    ipv6_addr_t source_address;                       /**< request source address  */
 #endif
 } coap_pkt_t;
 
