@@ -27,6 +27,7 @@
 
 #include "assert.h"
 #include "net/gcoap.h"
+#include "net/udp.h"
 #include "net/sock/async/event.h"
 #include "net/sock/util.h"
 #include "mutex.h"
@@ -46,7 +47,7 @@
 static void *_event_loop(void *arg);
 static void _on_sock_evt(sock_udp_t *sock, sock_async_flags_t type, void *arg);
 static void _process_coap_pdu(sock_udp_t *sock, sock_udp_ep_t *remote,
-                              uint8_t *buf, size_t len);
+                              sock_udp_aux_rx_t *aux, uint8_t *buf, size_t len);
 static ssize_t _well_known_core_handler(coap_pkt_t* pdu, uint8_t *buf, size_t len, void *ctx);
 static void _cease_retransmission(gcoap_request_memo_t *memo);
 static size_t _handle_req(coap_pkt_t *pdu, uint8_t *buf, size_t len,
@@ -139,21 +140,22 @@ static void _on_sock_evt(sock_udp_t *sock, sock_async_flags_t type, void *arg)
 {
     (void)arg;
     sock_udp_ep_t remote;
+    sock_udp_aux_rx_t aux;
 
     if (type & SOCK_ASYNC_MSG_RECV) {
-        ssize_t res = sock_udp_recv(sock, _listen_buf, sizeof(_listen_buf),
-                                    0, &remote);
+        ssize_t res = sock_udp_recv_aux(sock, _listen_buf, sizeof(_listen_buf),
+                                    0, &remote, &aux);
         if (res <= 0) {
             DEBUG("gcoap: udp recv failure: %d\n", (int)res);
             return;
         }
-        _process_coap_pdu(sock, &remote, _listen_buf, res);
+        _process_coap_pdu(sock, &remote, &aux, _listen_buf, res);
     }
 }
 
 /* Processes and evaluates the coap pdu */
 static void _process_coap_pdu(sock_udp_t *sock, sock_udp_ep_t *remote,
-                              uint8_t *buf, size_t len)
+                              sock_udp_aux_rx_t *aux, uint8_t *buf, size_t len)
 {
     coap_pkt_t pdu;
     gcoap_request_memo_t *memo = NULL;
@@ -198,6 +200,9 @@ static void _process_coap_pdu(sock_udp_t *sock, sock_udp_ep_t *remote,
         /* normal request */
         else if (coap_get_type(&pdu) == COAP_TYPE_NON
                 || coap_get_type(&pdu) == COAP_TYPE_CON) {
+            #if IS_USED(MODULE_NANOCOAP_PKT_IPV6_ADDRESS)
+                memcpy(&pdu.source_address, &aux->local.addr.ipv6, sizeof(ipv6_addr_t));
+            #endif
             size_t pdu_len = _handle_req(&pdu, _listen_buf, sizeof(_listen_buf),
                                             remote);
             if (pdu_len > 0) {
