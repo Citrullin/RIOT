@@ -88,6 +88,7 @@
 #ifdef RIOT_VERSION
 #include "byteorder.h"
 #include "net/coap.h"
+#include "net/ipv6/addr.h"
 #else
 #include "coap.h"
 #include <arpa/inet.h>
