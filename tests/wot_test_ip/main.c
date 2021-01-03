@@ -11,47 +11,50 @@
 #define MAIN_QUEUE_SIZE (4)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
-static ipv6_addr_t *get_base_ip_address(void)
-{
+static ipv6_addr_t *get_base_ip_address(void){
     const int MAX_ADRESSES = 5;
-    netif_t *interface = netif_iter(NULL);
-    ipv6_addr_t *local_address = NULL;
-    ipv6_addr_t *ula_address = NULL;
+    netif_t* interface = netif_iter(NULL);
+    ipv6_addr_t* local_address = NULL;
+    ipv6_addr_t* ula_address = NULL;
 
-    while (interface != NULL)
-    {
+    while(interface != NULL) {
         ipv6_addr_t adresses[MAX_ADRESSES];
         netif_get_opt(interface, NETOPT_IPV6_ADDR, 0, adresses, sizeof(adresses));
         for (int i = 0; i < MAX_ADRESSES; i++)
         {
-            ipv6_addr_t *current_address = &adresses[i];
+            ipv6_addr_t* current_address = &adresses[i];
 
-            if (current_address == NULL)
-            {
+            if (current_address == NULL) {
                 break;
             }
-            if (ipv6_addr_is_global(current_address))
-            {
+            printf("Loop begin\n");
+            if (ipv6_addr_is_global(current_address)) {
+                printf("Global address: ");
+                ipv6_addr_print(current_address);
+                printf("\n");
+                printf("Loop end\n");
                 return current_address;
             }
-            else if (ipv6_addr_is_unique_local_unicast(current_address))
-            {
+            else if (ipv6_addr_is_unique_local_unicast(current_address)) {
+                printf("Unique local unicast: ");
                 ula_address = current_address;
             }
-            else if (ipv6_addr_is_link_local(current_address))
-            {
+            else if (ipv6_addr_is_link_local(current_address)) {
+                printf("Link local address: ");
                 local_address = current_address;
             }
+            ipv6_addr_print(current_address);
+            printf("\n");
+            printf("Loop end\n");
         }
         interface = netif_iter(interface);
     }
 
-    if (ula_address != NULL)
-    {
+    if (ula_address != NULL) {
         return local_address;
+        return 0;
     }
-    else if (local_address != NULL)
-    {
+    else if (local_address != NULL) {
         return local_address;
     }
     return NULL;
@@ -69,10 +72,12 @@ int ip_test_cmd(int argc, char **argv)
         char address_as_string[IPV6_ADDR_MAX_STR_LEN];
         ipv6_addr_t *base_ip_adress = get_base_ip_address();
         assert(base_ip_adress);
+        printf("ipv6_addr_print:\n");
         ipv6_addr_print(base_ip_adress);
-        printf("\n");
+        printf("\nipv6_addr_to_str:\n");
         ipv6_addr_to_str(address_as_string, base_ip_adress, sizeof(address_as_string));
         print_str(address_as_string);
+        printf("\n");
         return 0;
     }
 
