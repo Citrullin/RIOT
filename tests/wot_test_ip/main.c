@@ -13,12 +13,12 @@ static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 static ipv6_addr_t *get_base_ip_address(void){
     const int MAX_ADRESSES = 5;
-    netif_t* interface = netif_iter(NULL);
+    netif_t* interface = NULL;
     ipv6_addr_t* local_address = NULL;
     ipv6_addr_t* ula_address = NULL;
 
-    while(interface != NULL) {
         ipv6_addr_t adresses[MAX_ADRESSES];
+    while ((interface = netif_iter(interface)) != NULL) {
         netif_get_opt(interface, NETOPT_IPV6_ADDR, 0, adresses, sizeof(adresses));
         for (int i = 0; i < MAX_ADRESSES; i++)
         {
@@ -47,7 +47,6 @@ static ipv6_addr_t *get_base_ip_address(void){
             printf("\n");
             printf("Loop end\n");
         }
-        interface = netif_iter(interface);
     }
 
     if (ula_address != NULL) {
