@@ -59,16 +59,18 @@ static ipv6_addr_t *get_base_ip_address(void)
 
 int ip_test_cmd(int argc, char **argv)
 {
-    if (argc != 1)
+    if (argc != 2)
     {
         (void)puts("Usage: iptest test");
         return 1;
     }
-    if (strcmp(argv[1], "on") == 0)
+    if (strcmp(argv[1], "test") == 0) 
     {
         char address_as_string[IPV6_ADDR_MAX_STR_LEN];
         ipv6_addr_t *base_ip_adress = get_base_ip_address();
         assert(base_ip_adress);
+        ipv6_addr_print(base_ip_adress);
+        printf("\n");
         ipv6_addr_to_str(address_as_string, base_ip_adress, sizeof(address_as_string));
         print_str(address_as_string);
         return 0;
@@ -78,7 +80,7 @@ int ip_test_cmd(int argc, char **argv)
 }
 
 static const shell_command_t shell_commands[] = {
-    {"iptest", "Control an LED.", ip_test_cmd},
+    {"iptest", "Get an IP address of the highest order possible.", ip_test_cmd},
     {NULL, NULL, NULL}};
 
 int main(void)
