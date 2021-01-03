@@ -165,7 +165,8 @@ static ssize_t _wot_td_coap_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len, v
     ipv6_addr_t* base_ip_adress = get_base_ip_address();
     assert(base_ip_adress);
     ipv6_addr_to_str(address_as_string, base_ip_adress, sizeof(address_as_string));
-    puts(address_as_string);
+    print_str(address_as_string);
+    printf("\n");
 
     wot_td_uri_t _wot_thing_base = {
             .schema = wot_td_coap_schema,
