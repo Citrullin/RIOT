@@ -12,15 +12,15 @@
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 static ipv6_addr_t *get_base_ip_address(void){
-    const int MAX_ADRESSES = 5;
+    const int MAX_ADRESSES_TO_CHECK = 5;
     netif_t* interface = NULL;
     ipv6_addr_t* local_address = NULL;
     ipv6_addr_t* ula_address = NULL;
 
-        ipv6_addr_t adresses[MAX_ADRESSES];
     while ((interface = netif_iter(interface)) != NULL) {
+        ipv6_addr_t adresses[MAX_ADRESSES_TO_CHECK];
         netif_get_opt(interface, NETOPT_IPV6_ADDR, 0, adresses, sizeof(adresses));
-        for (int i = 0; i < MAX_ADRESSES; i++)
+        for (int i = 0; i < MAX_ADRESSES_TO_CHECK; i++)
         {
             ipv6_addr_t* current_address = &adresses[i];
 
