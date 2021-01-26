@@ -18,6 +18,7 @@ USEMODULE += gnrc_ipv6_default
 USEMODULE += gcoap
 # Additional networking modules that can be dropped if not needed
 USEMODULE += gnrc_icmpv6_echo
+USEMODULE += nanocoap_pkt_ipv6_address
 
 # Required by gcoap example
 USEMODULE += od

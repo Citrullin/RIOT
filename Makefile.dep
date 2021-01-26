@@ -108,3 +108,7 @@ ifneq (,$(filter test_utils_interactive_sync,$(USEMODULE)))
     DEFAULT_MODULE += test_utils_interactive_sync_shell
   endif
 endif
+
+ifneq (,$(filter nanocoap_pkt_ipv6_address,$(USEMODULE)))
+  USEMODULE += sock_aux_local
+endif
