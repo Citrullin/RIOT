@@ -18,6 +18,8 @@ static ssize_t _encode_link(const coap_resource_t *resource, char *buf,
 wot_td_thing_t wot_thing;
 
 const char wot_td_coap_schema[] = "coap://";
+const char coap_multicast_addr_str[] = "ff02::fd";
+static ipv6_addr_t coap_multicast_addr = {0};
 
 //Todo: Implement CoAP RDF bindings.
 //See: https://github.com/w3c/wot-binding-templates/issues/97
@@ -248,5 +250,10 @@ void wot_td_coap_server_init(void)
     wot_td_coap_config_init(&wot_thing);
 
     gcoap_init();
+    gnrc_netif_t* netif = NULL;
+    while (gnrc_netif_iter(netif) != NULL) {
+        gnrc_netif_addr_from_str(coap_multicast_addr_str, (uint8_t *) &coap_multicast_addr);
+        gnrc_netif_ipv6_group_join(netif, &coap_multicast_addr);
+    }
     gcoap_register_listener(&_wot_td_gcoap_listener);
 }
