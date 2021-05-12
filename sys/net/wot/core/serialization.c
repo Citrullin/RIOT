@@ -6,6 +6,8 @@
 #include "net/wot.h"
 #include "net/wot/serialization.h"
 
+//Todo: Continue reducing extensive usage of duplicated obj keys etc.
+//Todo: Possible to combine multiple const chars. Write function for that.
 const char wot_td_ser_obj_context_key[] = "@context";
 const char wot_td_ser_w3c_context_value[] = "https://www.w3.org/2019/wot/td/v1";
 const char wot_td_ser_true[] = "true";
@@ -59,6 +61,8 @@ const char wot_td_ser_form_obj_key[] = "forms";
 const char wot_td_created_obj_key[] = "created";
 const char wot_td_modified_obj_key[] = "modified";
 const char wot_td_ser_prop_aff_obj_key[] = "properties";
+const char wot_td_identity_obj_key[] = "identity";
+const char wot_td_authorization_key[] = "authorization";
 
 void _reverse(char s[])
 {
@@ -99,6 +103,7 @@ int _wot_td_fill_json_receiver(wot_td_serialize_receiver_t receiver, const char 
 
         slicer->cur += 1;
     }
+
     return 0;
 }
 
@@ -158,6 +163,76 @@ void _wot_td_fill_json_bool(wot_td_serialize_receiver_t receiver, bool value, wo
     }
 }
 
+//Todo: Refactor and move into another c file.
+typedef struct wot_td_norm_obj {
+    struct wot_td_norm_obj * next;
+    const char * key;
+    void *value;
+} wot_td_norm_obj_t;
+
+typedef struct wot_td_norm_array {
+    struct wot_td_norm_array * next;
+    void *value;
+} wot_td_norm_array_t;
+
+typedef void (*wot_td_obj_serializer_t)(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, char *lang, void *data);
+
+typedef struct {
+    wot_td_serialize_receiver_t receiver;
+    wot_td_ser_slicer_t *slicer;
+    wot_td_obj_serializer_t serializer;
+    wot_td_norm_obj_t *data;
+    char *lang;
+}  wot_td_obj_serializer_params_t;
+
+typedef struct {
+    wot_td_serialize_receiver_t receiver;
+    wot_td_ser_slicer_t *slicer;
+    wot_td_obj_serializer_t serializer;
+    wot_td_norm_array_t *data;
+    char *lang;
+}  wot_td_array_serializer_params_t;
+
+
+//Gets rid of all the functions with { }. Create generalized function for it.
+void _wot_td_serialize_json_obj(wot_td_obj_serializer_params_t *params){
+    wot_td_norm_obj_t *data = params->data;
+    _wot_td_fill_json_receiver(params->receiver, "{", 1, params->slicer);
+
+    while(data != NULL){
+        _wot_td_fill_json_obj_key(params->receiver, data->key, strlen(data->key), params->slicer);
+        params->serializer(params->receiver, params->slicer, params->lang, data->value);
+        if(data->next != NULL){
+             _wot_td_fill_json_receiver(params->receiver, ",", 1, params->slicer);
+        }
+        data = data->next;
+    }
+    
+    _wot_td_fill_json_receiver(params->receiver, "}", 1, params->slicer);
+}
+
+//Gets rid of all the functions with [ ]. Create generalized function for it.
+void _wot_td_serialize_json_array(wot_td_array_serializer_params_t *params){
+    wot_td_norm_array_t *data = params->data;
+    _wot_td_fill_json_receiver(params->receiver, "[", 1, params->slicer);
+
+    while(data != NULL){
+        params->serializer(params->receiver, params->slicer, params->lang, data->value);
+        if(data->next != NULL){
+             _wot_td_fill_json_receiver(params->receiver, ",", 1, params->slicer);
+        }
+        data = data->next;
+    }
+    
+    _wot_td_fill_json_receiver(params->receiver, "]", 1, params->slicer);
+}
+
+void _wot_td_string_writer(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, char *lang, void *data){
+    (void)lang;
+    const char *string = (const char *) data;
+    _wot_td_fill_json_string(receiver, string, strlen(string), slicer);
+}
+
 void _previous_prop_check(wot_td_serialize_receiver_t receiver, bool has_previous_prop, wot_td_ser_slicer_t *slicer){
     if(has_previous_prop){
         _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
@@ -191,43 +266,43 @@ void _serialize_context_array(wot_td_serialize_receiver_t receiver, json_ld_cont
 }
 
 void _serialize_type_array(wot_td_serialize_receiver_t receiver, wot_td_type_t *type, wot_td_ser_slicer_t *slicer){
-    _wot_td_fill_json_obj_key(receiver, wot_td_type_obj_key, sizeof(wot_td_type_obj_key)-1, slicer);
-    _wot_td_fill_json_receiver(receiver, "[", 1, slicer);
-    wot_td_type_t *tmp_type = type;
-    while(tmp_type != NULL){
-        _wot_td_fill_json_string(receiver, tmp_type->value, strlen(tmp_type->value), slicer);
-        if(tmp_type->next != NULL){
-            _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
-        }
-        tmp_type = tmp_type->next;
-    }
-    _wot_td_fill_json_receiver(receiver, "]", 1, slicer);
+    _wot_td_fill_json_obj_key(receiver, wot_td_titles_obj_key, sizeof(wot_td_titles_obj_key)-1, slicer);
+    wot_td_array_serializer_params_t params = {
+        .receiver = receiver,
+        .slicer = slicer,
+        .data = (wot_td_norm_array_t *)type,
+        .serializer = (wot_td_obj_serializer_t)&_wot_td_string_writer,
+    };
+    _wot_td_serialize_json_array(&params);
 }
 
-void _serialize_lang(wot_td_serialize_receiver_t receiver, wot_td_multi_lang_t *lang, wot_td_ser_slicer_t *slicer){
-    _wot_td_fill_json_obj_key(receiver, lang->tag, strlen(lang->tag), slicer);
-    _wot_td_fill_json_string(receiver, lang->value, strlen(lang->value), slicer);
+void _serialize_lang(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, char * lang, void * data){
+    (void)lang;
+    const char *value = data;
+    _wot_td_fill_json_string(receiver, value, strlen(value), slicer);
 }
 
 void _serialize_title_array(wot_td_serialize_receiver_t receiver, wot_td_multi_lang_t *titles, char *lang, wot_td_ser_slicer_t *slicer){
+    _wot_td_fill_json_obj_key(receiver, wot_td_titles_obj_key, sizeof(wot_td_titles_obj_key)-1, slicer);
+    wot_td_obj_serializer_params_t params = {
+        .receiver = receiver,
+        .slicer = slicer,
+        .data = (wot_td_norm_obj_t *)titles,
+        .serializer = (wot_td_obj_serializer_t)&_serialize_lang,
+    };
+    _wot_td_serialize_json_obj(&params);
+
+    //Todo: Hopefully TD 2.0 spec doesn't require this anymore.
     wot_td_multi_lang_t *tmp = titles;
     wot_td_multi_lang_t *default_title = NULL;
-    _wot_td_fill_json_obj_key(receiver, wot_td_titles_obj_key, sizeof(wot_td_titles_obj_key)-1, slicer);
-
-    _wot_td_fill_json_receiver(receiver, "{", 1, slicer);
-    while(tmp != NULL){
-        _serialize_lang(receiver, tmp, slicer);
-
+    while(tmp != NULL && default_title == NULL){
         if(lang != NULL && strcmp(tmp->tag, lang) == 0){
             default_title = tmp;
         }
-
-        if(tmp->next != NULL){
-            _previous_prop_check(receiver, true, slicer);
+        if(default_title == NULL){
+            tmp = tmp->next;
         }
-        tmp = tmp->next;
     }
-    _wot_td_fill_json_receiver(receiver, "}", 1, slicer);
 
     if(default_title != NULL){
         _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
@@ -237,23 +312,26 @@ void _serialize_title_array(wot_td_serialize_receiver_t receiver, wot_td_multi_l
 }
 
 void _serialize_description_array(wot_td_serialize_receiver_t receiver, wot_td_multi_lang_t *desc, char *lang, wot_td_ser_slicer_t *slicer){
+    _wot_td_fill_json_obj_key(receiver, wot_td_description_obj_key, sizeof(wot_td_description_obj_key)-1, slicer);
+    wot_td_obj_serializer_params_t params = {
+        .receiver = receiver,
+        .slicer = slicer,
+        .data = (wot_td_norm_obj_t *)desc,
+        .serializer = (wot_td_obj_serializer_t)&_serialize_lang,
+    };
+    _wot_td_serialize_json_obj(&params);
+
+    //Todo: Same here. Check, if TD 2.0 spec still requires this.
     wot_td_multi_lang_t *tmp = desc;
     wot_td_multi_lang_t *default_description = NULL;
-    _wot_td_fill_json_obj_key(receiver, wot_td_description_obj_key, sizeof(wot_td_description_obj_key)-1, slicer);
-    _wot_td_fill_json_receiver(receiver, "{", 1, slicer);
-    while(tmp != NULL){
-        _serialize_lang(receiver, tmp, slicer);
-
+    while(tmp != NULL && default_description == NULL){
         if(lang != NULL && strcmp(tmp->tag, lang) == 0){
             default_description = tmp;
         }
-
-        if(tmp->next != NULL){
-            _previous_prop_check(receiver, true, slicer);
+        if(default_description == NULL){
+            tmp = tmp->next;
         }
-        tmp = tmp->next;
     }
-    _wot_td_fill_json_receiver(receiver, "}", 1, slicer);
 
     if(default_description != NULL){
         _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
@@ -354,7 +432,7 @@ void _serialize_sec_scheme_bearer(wot_td_serialize_receiver_t receiver, wot_td_b
     bool has_previous_prop = false;
     if(scheme->authorization != NULL){
         has_previous_prop = true;
-        _wot_td_fill_json_obj_key(receiver, "authorization", sizeof("authorization")-1, slicer);
+        _wot_td_fill_json_obj_key(receiver, wot_td_authorization_key, sizeof(wot_td_authorization_key)-1, slicer);
         _wot_td_fill_json_uri(receiver, scheme->authorization, slicer);
     }
 
@@ -369,7 +447,7 @@ void _serialize_sec_scheme_bearer(wot_td_serialize_receiver_t receiver, wot_td_b
     if(scheme->format != NULL){
         _previous_prop_check(receiver, has_previous_prop, slicer);
         has_previous_prop = true;
-        _wot_td_fill_json_obj_key(receiver, "format", sizeof("format")-1, slicer);
+        _wot_td_fill_json_obj_key(receiver, wot_td_format_obj_key, sizeof(wot_td_format_obj_key)-1, slicer);
         _wot_td_fill_json_string(receiver, scheme->format, strlen(scheme->format), slicer);
     }
 
@@ -389,7 +467,7 @@ void _serialize_sec_scheme_bearer(wot_td_serialize_receiver_t receiver, wot_td_b
 
 void _serialize_sec_scheme_psk(wot_td_serialize_receiver_t receiver, wot_td_psk_sec_scheme_t *scheme, wot_td_ser_slicer_t *slicer){
     if(scheme->identity != NULL){
-        _wot_td_fill_json_obj_key(receiver, "identity", sizeof("identity")-1, slicer);
+        _wot_td_fill_json_obj_key(receiver, wot_td_identity_obj_key, sizeof(wot_td_identity_obj_key)-1, slicer);
         _wot_td_fill_json_string(receiver, scheme->identity, strlen(scheme->identity), slicer);
     }
 }
@@ -400,7 +478,7 @@ void _serialize_sec_scheme_oauth2(wot_td_serialize_receiver_t receiver, wot_td_o
 
     if(scheme->authorization != NULL){
         _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
-        _wot_td_fill_json_obj_key(receiver, "authorization", sizeof("authorization")-1, slicer);
+        _wot_td_fill_json_obj_key(receiver, wot_td_authorization_key, sizeof(wot_td_authorization_key)-1, slicer);
         _wot_td_fill_json_uri(receiver, scheme->authorization, slicer);
     }
 
@@ -420,7 +498,13 @@ void _serialize_sec_scheme_oauth2(wot_td_serialize_receiver_t receiver, wot_td_o
     if(scheme->scopes != NULL){
         _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
         _wot_td_fill_json_obj_key(receiver, "scopes", sizeof("scopes")-1, slicer);
-        _wot_td_fill_json_uri(receiver, scheme->refresh, slicer);
+        wot_td_array_serializer_params_t params = {
+            .receiver = receiver,
+            .slicer = slicer,
+            .data = (wot_td_norm_array_t *)scheme->scopes,
+            .serializer = (wot_td_obj_serializer_t)&_wot_td_string_writer,
+        };
+        _wot_td_serialize_json_array(&params);
     }
 }
 
@@ -449,7 +533,8 @@ void _serialize_security_schema(wot_td_serialize_receiver_t receiver, wot_td_sec
     }
 }
 
-void _serialize_security(wot_td_serialize_receiver_t receiver, wot_td_sec_scheme_t *scheme, char *lang, wot_td_ser_slicer_t *slicer){
+void _serialize_security(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, char *lang, void *data){
+    wot_td_sec_scheme_t *scheme = (wot_td_sec_scheme_t *)data;
     _wot_td_fill_json_receiver(receiver, "{", 1, slicer);
 
     _wot_td_fill_json_obj_key(receiver, wot_td_schema_obj_key, sizeof(wot_td_schema_obj_key)-1, slicer);
@@ -471,39 +556,39 @@ void _serialize_security(wot_td_serialize_receiver_t receiver, wot_td_sec_scheme
 }
 
 void _serialize_security_def_array(wot_td_serialize_receiver_t receiver, wot_td_security_definition_t *security_def, char *lang, wot_td_ser_slicer_t *slicer){
-    wot_td_security_definition_t *tmp_sec = security_def;
-    wot_td_sec_scheme_t *scheme = NULL;
     _wot_td_fill_json_obj_key(receiver, wot_td_security_def_obj_key, sizeof(wot_td_security_def_obj_key)-1, slicer);
-    _wot_td_fill_json_receiver(receiver, "{", 1, slicer);
-    while (tmp_sec != NULL){
-        scheme = tmp_sec->value;
-        _wot_td_fill_json_obj_key(receiver, tmp_sec->key, strlen(tmp_sec->key), slicer);
-        _serialize_security(receiver, scheme, lang, slicer);
-        if(tmp_sec->next != NULL){
-            _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
-        }
-        tmp_sec = tmp_sec->next;
-    }
-    _wot_td_fill_json_receiver(receiver, "}", 1, slicer);
+    wot_td_obj_serializer_params_t params = {
+        .receiver = receiver,
+        .slicer = slicer,
+        .data = (wot_td_norm_obj_t *)security_def,
+        .lang = lang,
+        .serializer = (wot_td_obj_serializer_t)&_serialize_security,
+    };
+    _wot_td_serialize_json_obj(&params);    
+}
+
+void _serialize_sec_def_string(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, char *lang, void *data){
+    (void)lang;
+    wot_td_security_definition_t *sec_def = (wot_td_security_definition_t *)data;
+    _wot_td_fill_json_string(receiver, sec_def->key, strlen(sec_def->key), slicer);
 }
 
 void _serialize_security_array(wot_td_serialize_receiver_t receiver, wot_td_security_t *security, wot_td_ser_slicer_t *slicer){
-    _wot_td_fill_json_obj_key(receiver, wot_td_security_def_obj_key, 8, slicer);
-    _wot_td_fill_json_receiver(receiver, "[", 1, slicer);
-    wot_td_security_t *tmp = security;
-    while (tmp != NULL){
-        _wot_td_fill_json_string(receiver, tmp->definition->key, strlen(tmp->definition->key), slicer);
-        if(tmp->next != NULL){
-            _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
-        }
-        tmp = tmp->next;
-    }
-    _wot_td_fill_json_receiver(receiver, "]", 1, slicer);
+   _wot_td_fill_json_obj_key(receiver, wot_td_security_def_obj_key, 8, slicer);
+    wot_td_array_serializer_params_t params = {
+        .receiver = receiver,
+        .slicer = slicer,
+        .data = (wot_td_norm_array_t *)security,
+        .serializer = (wot_td_obj_serializer_t)&_serialize_sec_def_string,
+    };
+    _wot_td_serialize_json_array(&params);
 }
 
 //Fixme: Use const vars
-void _form_op_type_string(wot_td_serialize_receiver_t receiver, wot_td_form_op_type_t op_type, wot_td_ser_slicer_t *slicer){
-    switch (op_type) {
+void _form_op_type_string(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, const char *lang, void *data){
+    (void)lang;
+    wot_td_form_op_type_t *op_type = (wot_td_form_op_type_t *)data;
+    switch (*op_type) {
         case FORM_OP_READ_PROPERTY:
             _wot_td_fill_json_string(receiver, "readproperty", sizeof("readproperty")-1, slicer);
             break;
@@ -511,9 +596,10 @@ void _form_op_type_string(wot_td_serialize_receiver_t receiver, wot_td_form_op_t
             _wot_td_fill_json_string(receiver, "writeproperty", sizeof("writeproperty")-1, slicer);
             break;
         case FORM_OP_OBSERVE_PROPERTY:
-            _wot_td_fill_json_string(receiver, "writeproperty", sizeof("writeproperty")-1, slicer);
+            _wot_td_fill_json_string(receiver, "observeproperty", sizeof("observeproperty")-1, slicer);
             break;
         case FORM_OP_UNOBSERVE_PROPERTY:
+            //Todo: Implement multi const char write function. e.g. const char unobserve + const char property
             _wot_td_fill_json_string(receiver, "unobserveproperty", sizeof("unobserveproperty")-1, slicer);
             break;
         case FORM_OP_INVOKE_ACTION:
@@ -544,16 +630,14 @@ void _form_op_type_string(wot_td_serialize_receiver_t receiver, wot_td_form_op_t
 }
 
 void _serialize_op_array(wot_td_serialize_receiver_t receiver, wot_td_form_op_t *op, wot_td_ser_slicer_t *slicer){
-    wot_td_form_op_t *tmp = op;
-    _wot_td_fill_json_receiver(receiver, "[", 1, slicer);
-    while(tmp != NULL){
-        _form_op_type_string(receiver, tmp->op_type, slicer);
-        if(tmp->next != NULL){
-            _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
-        }
-        tmp = tmp->next;
-    }
-    _wot_td_fill_json_receiver(receiver, "]", 1, slicer);
+    _wot_td_fill_json_obj_key(receiver, wot_td_security_def_obj_key, 8, slicer);
+    wot_td_array_serializer_params_t params = {
+        .receiver = receiver,
+        .slicer = slicer,
+        .data = (wot_td_norm_array_t *)op,
+        .serializer = (wot_td_obj_serializer_t)&_form_op_type_string,
+    };
+    _wot_td_serialize_json_array(&params);
 }
 
 void _media_type_string(wot_td_serialize_receiver_t receiver, wot_td_media_type_t media_type, wot_td_ser_slicer_t *slicer){
@@ -604,7 +688,7 @@ void _content_encoding_string(wot_td_serialize_receiver_t receiver, wot_td_conte
             _wot_td_fill_json_string(receiver, "deflate", sizeof("deflate")-1, slicer);
             break;
         case CONTENT_ENCODING_IDENTITY:
-            _wot_td_fill_json_string(receiver, "identity", sizeof("identity")-1, slicer);
+            _wot_td_fill_json_string(receiver, wot_td_identity_obj_key, sizeof(wot_td_identity_obj_key)-1, slicer);
             break;
         case CONTENT_ENCODING_BROTLI:
             _wot_td_fill_json_string(receiver, "br", sizeof("br")-1, slicer);
@@ -616,13 +700,21 @@ void _content_encoding_string(wot_td_serialize_receiver_t receiver, wot_td_conte
 }
 
 void _serialize_expected_response(wot_td_serialize_receiver_t receiver, wot_td_expected_res_t *res, wot_td_ser_slicer_t *slicer){
+    //Todo: use _wot_td_serialize_json_obj
     _wot_td_fill_json_receiver(receiver, "{", 1, slicer);
     _wot_td_fill_json_obj_key(receiver, "contentType", sizeof("contentType")-1, slicer);
     _content_type_string(receiver, res->content_type, slicer);
     _wot_td_fill_json_receiver(receiver, "}", 1, slicer);
 }
 
+void _wot_td_security_writer(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, char *lang, void *data){
+    (void)lang;
+    wot_td_security_t *security = (wot_td_security_t*)data;
+    _wot_td_fill_json_string(receiver, security->definition->key, strlen(security->definition->key), slicer);
+}
+
 void _serialize_form_array(wot_td_serialize_receiver_t receiver, wot_td_form_t *form, wot_td_ser_slicer_t *slicer){
+    //Todo: Use generic array and obj functions for it.
     wot_td_form_t *tmp = form;
 
     _wot_td_fill_json_receiver(receiver, "[", 1, slicer);
@@ -667,14 +759,15 @@ void _serialize_form_array(wot_td_serialize_receiver_t receiver, wot_td_form_t *
         if(tmp->security != NULL){
             _previous_prop_check(receiver, has_previous_prop, slicer);
             has_previous_prop = true;
+
             _wot_td_fill_json_obj_key(receiver, wot_td_security_def_obj_key, sizeof(wot_td_security_def_obj_key)-9, slicer);
-            wot_td_security_t *sec = tmp->security;
-            _wot_td_fill_json_receiver(receiver, "[", 1, slicer);
-            while (sec != NULL){
-                _wot_td_fill_json_string(receiver, sec->definition->key, strlen(sec->definition->key), slicer);
-                sec = sec->next;
-            }
-            _wot_td_fill_json_receiver(receiver, "]", 1, slicer);
+            wot_td_array_serializer_params_t params = {
+                .receiver = receiver,
+                .slicer = slicer,
+                .data = (wot_td_norm_array_t *)tmp->security,
+                .serializer = (wot_td_obj_serializer_t)&_wot_td_security_writer,
+            };
+            _wot_td_serialize_json_array(&params);
         }
 
         if(tmp->scopes != NULL){
