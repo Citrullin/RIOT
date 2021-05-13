@@ -5,13 +5,14 @@
 
 #include "net/wot.h"
 #include "net/wot/serialization.h"
+#include "net/wot/serialization/io.h"
+#include "net/wot/serialization/json_writer.h"
 
 //Todo: Continue reducing extensive usage of duplicated obj keys etc.
 //Todo: Possible to combine multiple const chars. Write function for that.
 const char wot_td_ser_obj_context_key[] = "@context";
 const char wot_td_ser_w3c_context_value[] = "https://www.w3.org/2019/wot/td/v1";
-const char wot_td_ser_true[] = "true";
-const char wot_td_ser_false[] = "false";
+
 const char wot_td_type_obj_key[] = "@type";
 const char wot_td_titles_obj_key[] = "titles";
 const char wot_td_description_obj_key[] = "descriptions";
@@ -63,175 +64,6 @@ const char wot_td_modified_obj_key[] = "modified";
 const char wot_td_ser_prop_aff_obj_key[] = "properties";
 const char wot_td_identity_obj_key[] = "identity";
 const char wot_td_authorization_key[] = "authorization";
-
-void _reverse(char s[])
-{
-    int i, j;
-
-    for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-        char c = s[i];
-        s[i] = s[j];
-        s[j] = c;
-    }
-}
-
-void _itoa(int n, char s[])
-{
-    int i, sign;
-    if ((sign = n) < 0)
-        n = -n;
-    i = 0;
-    do {
-        s[i++] = n % 10 + '0';
-    } while ((n /= 10) > 0);
-    if (sign < 0)
-        s[i++] = '-';
-    s[i] = '\0';
-    _reverse(s);
-}
-
-//Todo: Validate Thing struct. Separate functions?
-
-//Fixme: circuit breaker pattern? IPC message passing? Make it more elegant.
-//Fixme: Not working with slicer->start.
-//https://riot-os.org/api/group__core__msg.html
-int _wot_td_fill_json_receiver(wot_td_serialize_receiver_t receiver, const char *string, uint32_t length, wot_td_ser_slicer_t *slicer){
-    for(uint32_t i = 0; i < length; i++){
-        if(slicer->cur <= slicer->end){
-            receiver(&string[i]);
-        }
-
-        slicer->cur += 1;
-    }
-
-    return 0;
-}
-
-//Todo: Clearer naming convention?
-void _wot_td_fill_json_string(wot_td_serialize_receiver_t receiver, const char *string, uint32_t length, wot_td_ser_slicer_t *slicer){
-    _wot_td_fill_json_receiver(receiver, "\"", 1, slicer);
-    _wot_td_fill_json_receiver(receiver, string, length, slicer);
-    _wot_td_fill_json_receiver(receiver, "\"", 1, slicer);
-}
-
-void _wot_td_fill_json_uri(wot_td_serialize_receiver_t receiver, wot_td_uri_t *uri, wot_td_ser_slicer_t *slicer){
-    _wot_td_fill_json_receiver(receiver, "\"", 1, slicer);
-    //Fixme: Not very clean to have it here. Find better solution.
-    if(uri->schema != NULL){
-        _wot_td_fill_json_receiver(receiver, uri->schema, strlen(uri->schema), slicer);
-    }
-    _wot_td_fill_json_receiver(receiver, uri->value, strlen(uri->value), slicer);
-    _wot_td_fill_json_receiver(receiver, "\"", 1, slicer);
-}
-
-void _wot_td_fill_json_date(wot_td_serialize_receiver_t receiver, wot_td_date_time_t *date, wot_td_ser_slicer_t *slicer){
-    _wot_td_fill_json_receiver(receiver, "\"", 1, slicer);
-    char s[11];
-    _itoa(date->year, s);
-    _wot_td_fill_json_receiver(receiver, s, strlen(s), slicer);
-    _wot_td_fill_json_receiver(receiver, "-", 1, slicer);
-    _itoa(date->month, s);
-    _wot_td_fill_json_receiver(receiver, s, strlen(s), slicer);
-    _wot_td_fill_json_receiver(receiver, "-", 1, slicer);
-    _itoa(date->day, s);
-    _wot_td_fill_json_receiver(receiver, s, strlen(s), slicer);
-    _wot_td_fill_json_receiver(receiver, "T", 1, slicer);
-    _itoa(date->hour, s);
-    _wot_td_fill_json_receiver(receiver, s, strlen(s), slicer);
-    _wot_td_fill_json_receiver(receiver, ":", 1, slicer);
-    _itoa(date->minute, s);
-    _wot_td_fill_json_receiver(receiver, s, strlen(s), slicer);
-    _wot_td_fill_json_receiver(receiver, ":", 1, slicer);
-    _itoa(date->second, s);
-    _wot_td_fill_json_receiver(receiver, s, strlen(s), slicer);
-    _itoa(date->timezone_offset, s);
-    _wot_td_fill_json_receiver(receiver, s, strlen(s), slicer);
-
-    _wot_td_fill_json_receiver(receiver, "\"", 1, slicer);
-}
-
-void _wot_td_fill_json_obj_key(wot_td_serialize_receiver_t receiver, const char *string, uint32_t length, wot_td_ser_slicer_t *slicer){
-    _wot_td_fill_json_string(receiver, string, length, slicer);
-    _wot_td_fill_json_receiver(receiver, ":", 1, slicer);
-}
-
-void _wot_td_fill_json_bool(wot_td_serialize_receiver_t receiver, bool value, wot_td_ser_slicer_t *slicer){
-    if(value){
-        _wot_td_fill_json_receiver(receiver, wot_td_ser_true, sizeof(wot_td_ser_true)-1, slicer);
-    }else{
-        _wot_td_fill_json_receiver(receiver, wot_td_ser_false, sizeof(wot_td_ser_false)-1, slicer);
-    }
-}
-
-//Todo: Refactor and move into another c file.
-typedef struct wot_td_norm_obj {
-    struct wot_td_norm_obj * next;
-    const char * key;
-    void *value;
-} wot_td_norm_obj_t;
-
-typedef struct wot_td_norm_array {
-    struct wot_td_norm_array * next;
-    void *value;
-} wot_td_norm_array_t;
-
-typedef void (*wot_td_obj_serializer_t)(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, char *lang, void *data);
-
-typedef struct {
-    wot_td_serialize_receiver_t receiver;
-    wot_td_ser_slicer_t *slicer;
-    wot_td_obj_serializer_t serializer;
-    wot_td_norm_obj_t *data;
-    char *lang;
-}  wot_td_obj_serializer_params_t;
-
-typedef struct {
-    wot_td_serialize_receiver_t receiver;
-    wot_td_ser_slicer_t *slicer;
-    wot_td_obj_serializer_t serializer;
-    wot_td_norm_array_t *data;
-    char *lang;
-}  wot_td_array_serializer_params_t;
-
-
-//Gets rid of all the functions with { }. Create generalized function for it.
-void _wot_td_serialize_json_obj(wot_td_obj_serializer_params_t *params){
-    wot_td_norm_obj_t *data = params->data;
-    _wot_td_fill_json_receiver(params->receiver, "{", 1, params->slicer);
-
-    while(data != NULL){
-        _wot_td_fill_json_obj_key(params->receiver, data->key, strlen(data->key), params->slicer);
-        params->serializer(params->receiver, params->slicer, params->lang, data->value);
-        if(data->next != NULL){
-             _wot_td_fill_json_receiver(params->receiver, ",", 1, params->slicer);
-        }
-        data = data->next;
-    }
-    
-    _wot_td_fill_json_receiver(params->receiver, "}", 1, params->slicer);
-}
-
-//Gets rid of all the functions with [ ]. Create generalized function for it.
-void _wot_td_serialize_json_array(wot_td_array_serializer_params_t *params){
-    wot_td_norm_array_t *data = params->data;
-    _wot_td_fill_json_receiver(params->receiver, "[", 1, params->slicer);
-
-    while(data != NULL){
-        params->serializer(params->receiver, params->slicer, params->lang, data->value);
-        if(data->next != NULL){
-             _wot_td_fill_json_receiver(params->receiver, ",", 1, params->slicer);
-        }
-        data = data->next;
-    }
-    
-    _wot_td_fill_json_receiver(params->receiver, "]", 1, params->slicer);
-}
-
-void _wot_td_string_writer(wot_td_serialize_receiver_t receiver, wot_td_ser_slicer_t *slicer, char *lang, void *data){
-    (void)lang;
-    const char *string = (const char *) data;
-    _wot_td_fill_json_string(receiver, string, strlen(string), slicer);
-}
 
 void _previous_prop_check(wot_td_serialize_receiver_t receiver, bool has_previous_prop, wot_td_ser_slicer_t *slicer){
     if(has_previous_prop){

@@ -1,5 +1,6 @@
 ifneq (,$(filter wot_core,$(USEMODULE)))
   DIRS += core
+  DIRS += core/serialization
 endif
 ifneq (,$(filter wot_coap,$(USEMODULE)))
   DIRS += coap
