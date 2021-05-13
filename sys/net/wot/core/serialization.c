@@ -92,13 +92,13 @@ void _itoa(int n, char s[])
 //Fixme: Not working with slicer->start.
 //https://riot-os.org/api/group__core__msg.html
 int _wot_td_fill_json_receiver(wot_td_serialize_receiver_t receiver, const char *string, uint32_t length, wot_td_ser_slicer_t *slicer){
-    for(uint32_t i = 0; i < length; i++){
-        if(slicer->cur <= slicer->end){
+    if(!(slicer->cur > slicer->end)){
+        for(uint32_t i = 0; i < length; i++){
             receiver(&string[i]);
+            slicer->cur += 1;
         }
-
-        slicer->cur += 1;
     }
+
     return 0;
 }
 
