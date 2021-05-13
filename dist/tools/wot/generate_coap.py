@@ -836,7 +836,8 @@ def add_data_schema_array(parent: CStruct, field_name: str, json_name: str, sche
     if json_name in schema:
         struct_name = f'{parent.struct_name}_{field_name}'
         data_schemas = schema[json_name]
-        assert isinstance(data_schemas, list)
+        if not isinstance(data_schemas, list):
+            data_schemas = [data_schemas]
         for index, entry in enumerate(data_schemas):
             if index == 0:
                 parent.add_reference_field(field_name, f'{struct_name}_0')
@@ -870,7 +871,7 @@ def add_data_schema_field(parent: CStruct, field_name: str, json_name: str, sche
     if json_name in schema:
         data_schema_name = f'{parent.struct_name}_{field_name}_data_schema'
         parent.add_reference_field(field_name, data_schema_name)
-        generate_data_schema(parent, schema, data_schema_name)
+        generate_data_schema(parent, schema[json_name], data_schema_name)
 
 
 def add_descriptions(struct, schema):
@@ -912,7 +913,7 @@ def add_property_affordances(parent, thing):
             struct.add_field("key", f'"{property_name}"')
             struct.add_boolean_field("observable", "observable", prop)
             add_data_schema_field(struct, "data_schema",
-                                  "properties", prop)
+                                  property_name, properties)
             add_interaction_affordance(struct, "properties", prop)
             add_next_field(index, struct, struct_name, properties)
             parent.add_child(struct)

@@ -11,6 +11,7 @@ menu "Posix"
 config MODULE_POSIX_HEADERS
     bool
 
+rsource "inet/Kconfig"
 rsource "sleep/Kconfig"
 
 endmenu # Posix

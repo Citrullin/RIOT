@@ -810,6 +810,7 @@ void _serialize_data_schema_object(wot_td_serialize_receiver_t receiver, wot_td_
 
 void _serialize_data_schema_array(wot_td_serialize_receiver_t receiver, wot_td_array_schema_t *schema, char *lang, wot_td_ser_slicer_t *slicer){
     if(schema->items != NULL){
+        _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
         _wot_td_fill_json_obj_key(receiver, wot_td_item_obj_key, sizeof(wot_td_item_obj_key)-1, slicer);
         wot_td_data_schemas_t *item = schema->items;
         _wot_td_fill_json_receiver(receiver, "[", 1, slicer);
@@ -830,7 +831,7 @@ void _serialize_data_schema_array(wot_td_serialize_receiver_t receiver, wot_td_a
         _wot_td_fill_json_obj_key(receiver, wot_td_min_items_obj_key, sizeof(wot_td_min_items_obj_key) - 1, slicer);
         char min_items_output[32];
         _itoa(*schema->min_items, min_items_output);
-        _wot_td_fill_json_string(receiver, min_items_output, strlen(min_items_output), slicer);
+        _wot_td_fill_json_receiver(receiver, min_items_output, strlen(min_items_output), slicer);
     }
 
     if(schema->max_items != NULL){
@@ -840,7 +841,7 @@ void _serialize_data_schema_array(wot_td_serialize_receiver_t receiver, wot_td_a
         _wot_td_fill_json_obj_key(receiver, wot_td_max_items_obj_key, sizeof(wot_td_max_items_obj_key)-1, slicer);
         char max_items_output[32];
         _itoa(*schema->max_items, max_items_output);
-        _wot_td_fill_json_string(receiver, max_items_output, strlen(max_items_output), slicer);
+        _wot_td_fill_json_receiver(receiver, max_items_output, strlen(max_items_output), slicer);
     }
 }
 
@@ -869,32 +870,28 @@ void _serialize_data_schema_int(wot_td_serialize_receiver_t receiver, wot_td_int
         _wot_td_fill_json_obj_key(receiver, wot_td_min_obj_key, sizeof(wot_td_min_obj_key)-1, slicer);
         char min_output[23];
         _itoa(*schema->minimum, min_output);
-        _wot_td_fill_json_string(receiver, min_output, strlen(min_output), slicer);
+        _wot_td_fill_json_receiver(receiver, min_output, strlen(min_output), slicer);
         _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
 
         _wot_td_fill_json_obj_key(receiver, wot_td_max_obj_key, sizeof(wot_td_max_obj_key)-1, slicer);
         char max_output[23];
         _itoa(*schema->minimum, max_output);
-        _wot_td_fill_json_string(receiver, max_output, strlen(max_output), slicer);
+        _wot_td_fill_json_receiver(receiver, max_output, strlen(max_output), slicer);
     }
 }
 
 void _serialize_data_schema_subclass(wot_td_serialize_receiver_t receiver, wot_td_data_schema_t *data_schema, char *lang, wot_td_ser_slicer_t *slicer){
     switch (data_schema->json_type) {
         case JSON_TYPE_OBJECT:
-            _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
             _serialize_data_schema_object(receiver, (wot_td_object_schema_t *) data_schema->schema, lang, slicer);
             break;
         case JSON_TYPE_ARRAY:
-            _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
             _serialize_data_schema_array(receiver, (wot_td_array_schema_t *) data_schema->schema, lang, slicer);
             break;
         case JSON_TYPE_NUMBER:
-            _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
             _serialize_data_schema_number(receiver, (wot_td_number_schema_t *) data_schema->schema, slicer);
             break;
         case JSON_TYPE_INTEGER:
-            _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
             _serialize_data_schema_int(receiver, (wot_td_integer_schema_t *) data_schema->schema, slicer);
             break;
         default:
@@ -981,12 +978,12 @@ void _serialize_data_schema(wot_td_serialize_receiver_t receiver, wot_td_data_sc
         has_previous_prop = true;
         _wot_td_fill_json_obj_key(receiver, wot_td_one_of_obj_key, sizeof(wot_td_one_of_obj_key)-1, slicer);
         wot_td_data_schemas_t *tmp = data_schema->one_of;
-        _wot_td_fill_json_string(receiver, "[", 1, slicer);
+        _wot_td_fill_json_receiver(receiver, "[", 1, slicer);
         while (tmp != NULL){
             _serialize_data_schema(receiver, tmp->value, lang, true, slicer);
             tmp = tmp->next;
         }
-        _wot_td_fill_json_string(receiver, "]", 1, slicer);
+        _wot_td_fill_json_receiver(receiver, "]", 1, slicer);
     }
 
     if(data_schema->enumeration != NULL){
@@ -994,12 +991,15 @@ void _serialize_data_schema(wot_td_serialize_receiver_t receiver, wot_td_data_sc
         has_previous_prop = true;
         _wot_td_fill_json_obj_key(receiver, wot_td_enum_obj_key, sizeof(wot_td_enum_obj_key)-1, slicer);
         wot_td_data_enums_t *tmp = data_schema->enumeration;
-        _wot_td_fill_json_string(receiver, "[", 1, slicer);
+        _wot_td_fill_json_receiver(receiver, "[", 1, slicer);
         while (tmp != NULL){
             _wot_td_fill_json_string(receiver, tmp->value, strlen(tmp->value), slicer);
+            if (tmp->next != NULL){
+                _wot_td_fill_json_receiver(receiver, ",", 1, slicer);
+            }
             tmp = tmp->next;
         }
-        _wot_td_fill_json_string(receiver, "]", 1, slicer);
+        _wot_td_fill_json_receiver(receiver, "]", 1, slicer);
     }
 
     _previous_prop_check(receiver, has_previous_prop, slicer);
