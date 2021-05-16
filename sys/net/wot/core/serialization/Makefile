@@ -1,4 +1,3 @@
 MODULE = wot_core
-DIRS += serialization
 
 include $(RIOTBASE)/Makefile.base

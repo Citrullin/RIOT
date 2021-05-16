@@ -9,14 +9,14 @@ extern "C" {
 #endif
 
 typedef struct json_ld_context {
+    struct json_ld_context *next;
     const char *key;
     const char *value;
-    struct json_ld_context *next;
 } json_ld_context_t;
 
 typedef struct wot_td_type {
-    const char *value;
     struct wot_td_type *next;
+    const char *value;
 } wot_td_type_t;
 
 typedef enum {
@@ -76,8 +76,8 @@ typedef struct {
 } wot_td_psk_sec_scheme_t;
 
 typedef struct wot_td_auth_scope {
-    const char *value;
     struct wot_td_auth_scope *next;
+    const char *value;
 } wot_td_auth_scopes_t;
 
 typedef struct {
@@ -89,9 +89,9 @@ typedef struct {
 } wot_td_oauth2_sec_scheme_t;
 
 typedef struct wot_td_multi_language {
+    struct wot_td_multi_language *next;
     const char *tag;
     const char *value;
-    struct wot_td_multi_language *next;
 } wot_td_multi_lang_t;
 
 typedef struct {
@@ -103,14 +103,14 @@ typedef struct {
 } wot_td_sec_scheme_t;
 
 typedef struct wot_td_sec_def {
+    struct wot_td_sec_def *next;
     const char *key;
     wot_td_sec_scheme_t *value;
-    struct wot_td_sec_def *next;
 } wot_td_security_definition_t;
 
 typedef struct wot_td_sec {
-    wot_td_security_definition_t *definition;
     struct wot_td_sec *next;
+    wot_td_security_definition_t *definition;
 } wot_td_security_t;
 
 typedef enum {
@@ -128,8 +128,8 @@ typedef enum {
 } wot_td_form_op_type_t;
 
 typedef struct wot_td_form_op {
-    wot_td_form_op_type_t op_type;
     struct wot_td_form_op *next;
+    wot_td_form_op_type_t value;
 } wot_td_form_op_t;
 
 typedef enum {
@@ -141,9 +141,9 @@ typedef enum {
 } wot_td_media_type_t;
 
 typedef struct wot_td_media_type_parameter {
+    struct wot_td_media_type_parameter *next;
     const char *key;
     const char *value;
-    struct wot_td_media_type_parameter *next;
 } wot_td_media_type_parameter_t;
 
 typedef struct {
@@ -168,13 +168,14 @@ typedef void (*wot_td_serialize_receiver_t)(const char *c);
 typedef void (*wot_td_ser_parser_t)(wot_td_serialize_receiver_t receiver, const char * name, const void * data);
 
 typedef struct wot_td_extension {
+    struct wot_td_extension *next;
     const char *name;
     const void *data;
     wot_td_ser_parser_t parser;
-    struct wot_td_extension *next;
 } wot_td_extension_t;
 
 typedef struct wot_td_form {
+    struct wot_td_form *next;
     wot_td_form_op_t *op;
     wot_td_uri_t *href;
     wot_td_content_type_t *content_type;
@@ -184,7 +185,6 @@ typedef struct wot_td_form {
     wot_td_auth_scopes_t *scopes;
     wot_td_expected_res_t *expected_response;
     wot_td_extension_t *extensions;
-    struct wot_td_form *next;
 } wot_td_form_t;
 
 typedef struct {
@@ -198,13 +198,13 @@ typedef struct {
 } wot_td_integer_schema_t;
 
 typedef struct wot_td_object_required {
-    const char *value;
     struct wot_td_object_required *next;
+    const char *value;
 } wot_td_object_required_t;
 
 typedef struct wot_td_data_enum {
-    const char *value;
     struct wot_td_data_enum *next;
+    const char *value;
 } wot_td_data_enums_t;
 
 typedef enum {
@@ -234,8 +234,8 @@ typedef struct {
 } wot_td_data_schema_t;
 
 typedef struct wot_td_data_schemas {
-    wot_td_data_schema_t *value;
     struct wot_td_data_schemas *next;
+    wot_td_data_schema_t *value;
 } wot_td_data_schemas_t;
 
 typedef struct {
@@ -245,9 +245,9 @@ typedef struct {
 } wot_td_array_schema_t;
 
 typedef struct wot_td_data_schema_map {
+    struct wot_td_data_schema_map *next;
     const char *key;
     wot_td_data_schema_t *value;
-    struct wot_td_data_schema_map *next;
 } wot_td_data_schema_map_t;
 
 typedef struct {
@@ -264,30 +264,30 @@ typedef struct {
 } wot_td_int_affordance_t;
 
 typedef struct wot_td_prop_affordance {
+    struct wot_td_prop_affordance *next;
     const char *key;
     bool observable;
     wot_td_data_schema_t *data_schema;
     wot_td_int_affordance_t *int_affordance;
-    struct wot_td_prop_affordance *next;
 } wot_td_prop_affordance_t;
 
 typedef struct wot_td_action_affordance {
+    struct wot_td_action_affordance *next;
     const char *key;
     wot_td_data_schema_t *input;
     wot_td_data_schema_t *output;
     bool safe;
     bool idempotent;
     wot_td_int_affordance_t *int_affordance;
-    struct wot_td_action_affordance *next;
 } wot_td_action_affordance_t;
 
 typedef struct wot_td_event_affordance {
+    struct wot_td_event_affordance *next;
     const char *key;
     wot_td_data_schema_t *subscription;
     wot_td_data_schema_t *data;
     wot_td_data_schema_t *cancellation;
     wot_td_int_affordance_t *int_affordance;
-    struct wot_td_event_affordance *next;
 } wot_td_event_affordance_t;
 
 typedef struct {
@@ -305,11 +305,11 @@ typedef struct {
 } wot_td_date_time_t;
 
 typedef struct wot_td_link {
+    struct wot_td_link *next;
     wot_td_uri_t *href;
     wot_td_media_type_t type;
     const char *rel;
     wot_td_uri_t *anchor;
-    struct wot_td_link *next;
 } wot_td_link_t;
 
 typedef struct {
