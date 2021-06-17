@@ -139,7 +139,7 @@ static ssize_t _wot_td_coap_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len, v
     coap_block2_init(pdu, &_wot_td_coap_slicer);
 
     gcoap_resp_init(pdu, _wot_td_coap_buf, len, COAP_CODE_CONTENT);
-    coap_opt_add_format(pdu, COAP_FORMAT_JSON);
+    coap_opt_add_format(pdu, COAP_FORMAT_WOT_TD);
     coap_opt_add_block2(pdu, &_wot_td_coap_slicer, 1);
     _wot_td_coap_plen = coap_opt_finish(pdu, COAP_OPT_FINISH_PAYLOAD);
 
