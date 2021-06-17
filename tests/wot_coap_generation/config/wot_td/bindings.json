@@ -1,22 +1,18 @@
 {
-    "@context": ["https://www.w3.org/2019/wot/td/v1", { "@language": "en" }],
-    "id": "urn:dev:ops:32473-WoTLamp-1234",
-    "title": "Lamp Thing",
-    "titles": {
-        "en": "Lamp Thing",
-        "de": "Lampen-Ding"
-    },
-    "description": "Lamp Thing Description",
-    "descriptions": {
-        "en": "Lamp Thing Description",
-        "de": "Lampen-Ding-Beschreibung"
-    },
     "properties": {
         "status": {
             "forms": [
                 {
                     "riot_os:handler_function": "_led_status_handler",
                     "href": "/led/status"
+                }
+            ]
+        },
+        "rememberState": {
+            "forms": [
+                {
+                    "riot_os:handler_function": "_led_status_handler",
+                    "href": "{{BASE_TOPIC}}/{{FRIENDLY_NAME}}/set/remember_state"
                 }
             ]
         }

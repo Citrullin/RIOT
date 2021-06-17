@@ -1,9 +1,10 @@
-WOT_JSON_FILES = $(APPDIR)/$(WOT_INSTANCE_INFO) $(APPDIR)/$(WOT_THING_MODEL)
+WOT_JSON_FILES = $(APPDIR)/$(WOT_META_DATA) $(APPDIR)/$(WOT_BINDINGS_PATH) $(APPDIR)/$(WOT_PLACEHOLDERS_PATH) $(addprefix $(APPDIR)/,$(WOT_THING_MODELS))
 
 $(GENOBJC): $(SRC)
 
 $(SRC): $(GENSRC)
 
 $(GENSRC): $(WOT_JSON_FILES)
-	mkdir -p $(BINDIR)/$(MODULE) && cd $(BINDIR)/$(MODULE) && \
-		$(WOT_TD_GEN) --appdir $(APPDIR) --board $(BOARD) --used_modules $(USEMODULE) --thing_model $(WOT_THING_MODEL) --thing_instance_info $(WOT_INSTANCE_INFO) --output_path $(WOT_TD_CONFIG)
+	@echo "[INFO] Generating WoT CoAP Config under $(WOT_TD_CONFIG)"
+	@mkdir -p $(BINDIR)/$(MODULE) && cd $(BINDIR)/$(MODULE) && \
+		$(WOT_TD_GEN) --appdir $(APPDIR) --thing_models $(WOT_THING_MODELS) --meta_data_path $(WOT_META_DATA) --bindings_path $(WOT_BINDINGS_PATH) --placeholders_path $(WOT_PLACEHOLDERS_PATH) --output_path $(WOT_TD_CONFIG)

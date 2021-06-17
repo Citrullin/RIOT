@@ -10,8 +10,10 @@ USEMODULE += wot_coap
 USEMODULE += wot_coap_config
 USEMODULE += xtimer
 
-WOT_THING_MODEL = config/wot_td/thing_model.json
-WOT_INSTANCE_INFO = config/wot_td/instance.json
+WOT_THING_MODELS += config/wot_td/thing_model.json
+WOT_META_DATA := config/wot_td/meta_data.json
+WOT_BINDINGS_PATH := config/wot_td/bindings.json
+WOT_PLACEHOLDERS_PATH := config/wot_td/placeholders.json
 
 ifeq ($(BOARD),esp32-wroom-32)
 # ESP wifi configuration
