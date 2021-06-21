@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2021 Philipp Blum <???@example.org>
+ *
+ * This file is subject to the terms and conditions of the GNU Lesser
+ * General Public License v2.1. See the file LICENSE in the top level
+ * directory for more details.
+ */
+
+/**
+ * @defgroup    net_wot   Web of Things (WoT)
+ * @ingroup     net
+ * @brief       Data types and helper functions for WoT Thing Descriptions (TDs)
+ * @{
+ *
+ * @file
+ * @brief   Data types and helper function definitions for WoT TDs.
+ *
+ * @author  Philipp Blum <???@example.org>
+ */
 #ifndef NET_WOT_H
 #define NET_WOT_H
 
@@ -7,6 +26,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @name    WoT TD field definitions
+ * @{
+ */
+
 
 typedef struct json_ld_context {
     struct json_ld_context *next;
@@ -332,6 +357,9 @@ typedef struct {
     wot_td_security_definition_t *security_def;
     char *default_language_tag;
 } wot_td_thing_t;
+
+
+/** @} */
 
 int wot_td_thing_context_add(wot_td_thing_t *thing, json_ld_context_t *context);
 int wot_td_thing_context_rm(wot_td_thing_t *thing, json_ld_context_t *context);
